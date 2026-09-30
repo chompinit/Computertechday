@@ -226,6 +226,15 @@ const DB = {
     const d = Local.read(); d.checkins = d.checkins.filter(c => !(c.sid === sid && c.st === st)); Local.write(d); return {ok:true};
   },
   resetDemo(){ if (DB.mode === 'local') Local.write(makeSeed()); },
+  /* แก้ไขชื่อฐาน / วิทยากร / ห้อง (Admin) → ทุกเครื่องเห็นชื่อใหม่ */
+  async saveStation(st){
+    const row = {id:st.id, name:st.name, th:st.th, speaker:st.speaker, room:st.room, desc:st.desc};
+    if (DB.mode === 'remote') await api('POST', {action:'saveStation', key:apiKey, station:row});
+    const list = store.get(SKEY, []).filter(x => x.id !== row.id).concat([row]);
+    store.set(SKEY, list); applyStations(list);
+    window.dispatchEvent(new Event('stations-updated'));
+    return {ok:true};
+  },
   clearAll(){ if (DB.mode === 'local') Local.write({v:2, students:{}, checkins:[]}); },
   /* จำลองผู้เข้าร่วม (เฉพาะโหมดทดลอง แตะเฉพาะนักเรียนตัวอย่าง) */
   simTick(){
@@ -260,6 +269,31 @@ const DB = {
   },
 };
 const _write = Local.write; Local.write = d => { _write(d); DB._onLocal && DB._onLocal(); };
+
+/* ================= ชื่อฐานที่ Admin แก้ไข =================
+   ใช้ค่าที่จำไว้ในเครื่องก่อน (เปิดหน้าได้ทันที) แล้วดึงค่าล่าสุดจากเซิร์ฟเวอร์ ถ้าเปลี่ยนจะแจ้ง 'stations-updated' */
+const SKEY = 'ttr-stations-v1';
+function applyStations(list){
+  let changed = false;
+  (list || []).forEach(o => {
+    const s = ST[+o.id]; if (!s) return;
+    ['name', 'th', 'speaker', 'room', 'desc'].forEach(k => {
+      const v = o[k] == null ? '' : String(o[k]).trim();
+      if (v && s[k] !== v) { s[k] = v; changed = true; }
+    });
+  });
+  return changed;
+}
+applyStations(store.get(SKEY, []));
+async function refreshStations(){
+  if (DB.mode !== 'remote') return;
+  try {
+    const list = (await api('GET', {action:'stations'})).stations || [];
+    store.set(SKEY, list);
+    if (applyStations(list)) window.dispatchEvent(new Event('stations-updated'));
+  } catch(e) {}
+}
+setTimeout(refreshStations, 0);
 
 /* ================= QR ================= */
 /* สร้าง QR เป็น <img> (qrcode-generator รองรับภาษาไทยแบบ UTF-8 และคัดลอกไปหน้าพิมพ์ได้) */

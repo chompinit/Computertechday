@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=8">
+<link rel="stylesheet" href="shared.css?v=9">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -88,7 +88,10 @@
     <section data-view="students" class="view" hidden>
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div><div class="eyebrow">Student Status</div><h2 class="text-3xl md:text-4xl font-bold mt-1">สถานะนักเรียนรายคน</h2></div>
-        <button class="btn btn-ghost btn-sm" id="btnCsv"><i class="fa-solid fa-file-csv"></i> ส่งออก CSV</button>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-purple btn-sm" id="btnBoard"><i class="fa-solid fa-display"></i> ฉายจอใหญ่</button>
+          <button class="btn btn-ghost btn-sm" id="btnCsv"><i class="fa-solid fa-file-csv"></i> ส่งออก CSV</button>
+        </div>
       </div>
       <div class="glass panel-pad mt-6 flex flex-wrap gap-3 items-center">
         <div class="flex-1 min-w-[200px] relative">
@@ -227,6 +230,23 @@
   </main>
 </div>
 
+<div class="modal-back" id="stModal" hidden>
+  <form class="modal glass panel-pad" id="stForm" autocomplete="off">
+    <div class="flex items-center gap-3"><div class="st-icon" id="stmIcon"></div><div><div class="eyebrow" id="stmNo"></div><h3 class="h-sec">แก้ไขข้อมูลฐาน</h3></div></div>
+    <div class="grid sm:grid-cols-2 gap-4 mt-5">
+      <div class="field sm:col-span-2"><label for="stmName">ชื่อฐาน</label><input class="input" id="stmName" maxlength="60" required></div>
+      <div class="field sm:col-span-2"><label for="stmTh">คำอธิบายสั้น (ภาษาไทย)</label><input class="input" id="stmTh" maxlength="80"></div>
+      <div class="field"><label for="stmSpeaker">วิทยากร</label><input class="input" id="stmSpeaker" maxlength="80"></div>
+      <div class="field"><label for="stmRoom">ห้อง / สถานที่</label><input class="input" id="stmRoom" maxlength="80"></div>
+      <div class="field sm:col-span-2"><label for="stmDesc">รายละเอียดกิจกรรม</label><textarea class="input" id="stmDesc" rows="2" maxlength="200"></textarea></div>
+    </div>
+    <p class="text-sm min-h-[1.4em] mt-3" id="stmMsg" role="status"></p>
+    <div class="flex flex-wrap gap-3 justify-end mt-2">
+      <button type="button" class="btn btn-ghost" id="stmCancel">ยกเลิก</button>
+      <button class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+    </div>
+  </form>
+</div>
 <div class="screen" id="screen" hidden>
   <button class="btn btn-ghost btn-sm screen-exit" id="btnScreenExit"><i class="fa-solid fa-xmark"></i> ออกจากจอใหญ่ (Esc)</button>
   <div id="screenBody"></div>
@@ -234,7 +254,7 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=8"></script>
+<script src="shared.js?v=9"></script>
 <script>
 (() => {
 const {parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
@@ -328,7 +348,7 @@ function render(){
   if (view === 'register') renderPass();
   if (view === 'cert') renderCert();
   if (view === 'settings') renderSettings();
-  if (!$('#screen').hidden) renderScreen();
+  if (!$('#screen').hidden) screenMode === 'board' ? renderBoard() : renderScreen();
 }
 
 /* ================= Dashboard ================= */
@@ -353,7 +373,8 @@ function renderDashboard(){
         <div class="st-icon" style="width:48px;height:48px;font-size:20px"><i class="fa-solid ${s.icon}"></i></div>
         <div class="text-right"><span class="ov-count ${prevCounts[s.id] !== undefined && prevCounts[s.id] !== counts[s.id] ? 'bump' : ''}">${counts[s.id]}</span><div class="text-xs faint">คนเข้าแล้ว</div></div>
       </div>
-      <div class="st-no mt-4 relative">STATION ${String(s.id).padStart(2,'0')}</div>
+      <div class="flex items-center justify-between gap-2 mt-4 relative"><div class="st-no">STATION ${String(s.id).padStart(2,'0')}</div>
+        <button class="chip" data-edit-st="${s.id}" title="แก้ไขข้อมูลฐานนี้"><i class="fa-solid fa-pen"></i> แก้ไข</button></div>
       <h4 class="text-lg font-semibold leading-tight relative">${esc(s.name)}</h4>
       <p class="text-sm muted relative">${esc(s.desc)}</p>
       <div class="ov-bar mt-4"><i style="width:${counts[s.id] / max * 100}%"></i></div>
@@ -438,11 +459,77 @@ function renderScreen(){
       </div>
     </div>`;
 }
+/* ================= Big screen: สถานะนักเรียน (ใช้ตัวกรองของแท็บสถานะนักเรียน) ================= */
+let screenMode = 'overview', boardPage = 0, boardTimer = 0;
+function renderBoard(){
+  const list = filtered();
+  const cls = $('#fClass').value, stf = $('#fStatus').selectedOptions[0].text;
+  const W = innerWidth, H = innerHeight;
+  const cols = Math.max(2, Math.floor((W - 60) / 250)), rows = Math.max(2, Math.floor((H - 250) / 118));
+  const per = cols * rows, pages = Math.max(1, Math.ceil(list.length / per));
+  if (boardPage >= pages) boardPage = 0;
+  const slice = list.slice(boardPage * per, boardPage * per + per);
+  const done = list.filter(s => visitedOf(s.sid).size >= MIN).length;
+  $('#screenBody').innerHTML = `
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <div class="flex items-center gap-5">${emblemSVG(false, 72)}<div><div class="scr-title"><span class="grad-text">สถานะนักเรียน</span> ${cls ? esc(cls) : 'ทุกห้อง'}</div>
+        <div class="scr-sub">Computer &amp; AI Innovation · ${esc(stf)} · ครบ ${MIN} ฐานรับเกียรติบัตร</div></div></div>
+      <div class="flex items-center gap-6">
+        <div class="text-right"><div class="scr-clock mono" style="font-size:clamp(28px,3vw,52px)">${done}<span class="faint" style="font-size:.5em">/${list.length}</span></div><div class="scr-sub" style="margin:0">ได้เกียรติบัตร</div></div>
+        <div class="scr-clock mono" id="scrClock">${clockText()}</div>
+      </div>
+    </div>
+    <div class="board mt-6" style="grid-template-columns:repeat(${cols}, minmax(0,1fr))">${slice.map(s => { const v = visitedOf(s.sid), n = v.size, ok = n >= MIN;
+      return `<div class="board-tile ${ok ? 'ok' : n ? '' : 'none'}">
+        <div class="min-w-0"><div class="bt-name">${esc(s.first)} ${esc(s.last)}</div><div class="bt-meta">${esc(s.cls)} · ${esc(s.sid)}</div>
+          <div class="dots sm mt-2">${STATIONS.map(st => `<span class="dot ${v.has(st.id) ? 'on' : ''}" style="--h:${st.h}"></span>`).join('')}</div></div>
+        <div class="bt-count">${ok ? '<i class="fa-solid fa-award"></i>' : ''}<b>${n}</b><span>/${STATIONS.length}</span></div></div>`; }).join('') || '<div class="empty">ไม่มีนักเรียนตามตัวกรองนี้</div>'}</div>
+    ${pages > 1 ? `<div class="board-pages">${Array.from({length:pages}, (_, i) => `<span class="${i === boardPage ? 'on' : ''}"></span>`).join('')}<span class="scr-sub" style="margin:0 0 0 10px">หน้า ${boardPage + 1}/${pages} · เปลี่ยนหน้าอัตโนมัติทุก 12 วินาที</span></div>` : ''}`;
+}
+async function openBoard(){
+  screenMode = 'board'; boardPage = 0;
+  $('#screen').hidden = false; document.body.style.overflow = 'hidden'; renderBoard();
+  clearInterval(boardTimer); boardTimer = setInterval(() => { boardPage++; renderBoard(); }, 12000);
+  try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(e) {}
+}
+$('#btnBoard').addEventListener('click', openBoard);
+window.addEventListener('resize', () => { if (!$('#screen').hidden && screenMode === 'board') renderBoard(); });
+
+/* ================= แก้ไขข้อมูลฐาน ================= */
+let editingSt = null;
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-edit-st]'); if (!b) return;
+  const s = ST[+b.dataset.editSt]; editingSt = s;
+  $('#stmIcon').style.setProperty('--h', s.h); $('#stmIcon').innerHTML = `<i class="fa-solid ${s.icon}"></i>`;
+  $('#stmNo').textContent = `STATION ${String(s.id).padStart(2, '0')}`;
+  $('#stmName').value = s.name; $('#stmTh').value = s.th; $('#stmSpeaker').value = s.speaker; $('#stmRoom').value = s.room; $('#stmDesc').value = s.desc;
+  $('#stmMsg').textContent = ''; $('#stModal').hidden = false; $('#stmName').focus();
+});
+const closeSt = () => { $('#stModal').hidden = true; editingSt = null; };
+$('#stmCancel').addEventListener('click', closeSt);
+$('#stModal').addEventListener('click', e => { if (e.target.id === 'stModal') closeSt(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#stModal').hidden) closeSt(); });
+$('#stForm').addEventListener('submit', async e => {
+  e.preventDefault(); if (!editingSt) return;
+  const name = $('#stmName').value.trim();
+  if (!name) { $('#stmMsg').innerHTML = '<span style="color:var(--red)">ต้องมีชื่อฐาน</span>'; return; }
+  $('#stmMsg').textContent = 'กำลังบันทึก…';
+  try {
+    await DB.saveStation({id:editingSt.id, name, th:$('#stmTh').value.trim(), speaker:$('#stmSpeaker').value.trim(), room:$('#stmRoom').value.trim(), desc:$('#stmDesc').value.trim()});
+    toast({title:`บันทึกฐานที่ ${editingSt.id} แล้ว`, body:esc(name), icon:'fa-floppy-disk'});
+    closeSt();
+  } catch(err) { $('#stmMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
+});
+/* ชื่อฐานเปลี่ยน (จากเครื่องนี้หรือโหลดจากเซิร์ฟเวอร์) → วาดใหม่ทุกส่วน */
+window.addEventListener('stations-updated', () => { for (const k in keys) delete keys[k]; render(); });
+
 async function openScreen(){
+  screenMode = 'overview'; clearInterval(boardTimer);
   $('#screen').hidden = false; document.body.style.overflow = 'hidden'; renderScreen();
   try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(e) {}
 }
 function closeScreen(){
+  clearInterval(boardTimer);
   $('#screen').hidden = true; document.body.style.overflow = '';
   if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
 }

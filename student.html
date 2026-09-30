@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=8">
+<link rel="stylesheet" href="shared.css?v=9">
 <style>
   body{margin:0}
   .login{max-width:440px;margin-inline:auto}
@@ -62,7 +62,10 @@
     <section id="meView" hidden>
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div class="min-w-0"><div class="eyebrow">สวัสดี</div><h1 class="text-3xl md:text-4xl font-bold mt-1 break-words" id="meName"></h1><div class="muted mono text-sm mt-1" id="meMeta"></div></div>
-        <span class="text-xs faint" id="updated"></span>
+        <div class="flex flex-col items-end gap-2">
+          <button class="btn btn-primary" id="btnQrFull"><i class="fa-solid fa-qrcode"></i> แสดง QR ให้ครูสแกน</button>
+          <span class="text-xs faint" id="updated"></span>
+        </div>
       </div>
 
       <div class="grid lg:grid-cols-[340px_1fr] gap-6 mt-6">
@@ -80,7 +83,8 @@
 
       <div class="grid lg:grid-cols-2 gap-6 mt-6">
         <div class="min-w-0">
-          <h2 class="h-sec mb-1">บัตร QR ของฉัน</h2>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="h-sec">บัตร QR ของฉัน</h2>
+            <button class="btn btn-ghost btn-sm" data-qr-full><i class="fa-solid fa-expand"></i> เต็มจอ</button></div>
           <p class="text-sm muted mb-4">ลืมบัตร? เปิดหน้านี้แล้วยื่นจอให้ครูประจำฐานสแกนได้เลย</p>
           <div id="passHolder"></div>
         </div>
@@ -94,13 +98,40 @@
 </div>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=8"></script>
+<script src="shared.js?v=9"></script>
 <script>
 (() => {
-const {SURVEY, CONFIG, STATIONS, ST, DB, $, esc, fullName, tFmt, store, parseQR, decodeImageFile, toast, emblemSVG, gaugeSVG, mountPass, mountCertificate, prepareCertPrint} = CAI;
+const {SURVEY, CONFIG, STATIONS, ST, DB, $, esc, fullName, tFmt, store, parseQR, qrPayload, drawQR, decodeImageFile, toast, emblemSVG, gaugeSVG, mountPass, mountCertificate, prepareCertPrint} = CAI;
 const MIN = CONFIG.MIN_STATIONS;
 const KEY = 'ttr-student-login';
-let me = null, lastKey = '';
+let me = null, lastKey = '', curStudent = null;
+
+/* QR เต็มจอ พื้นขาว ให้ครูสแกนง่าย (เปิดเต็มจอ + กันจอดับถ้าเบราว์เซอร์รองรับ) */
+let wakeLock = null;
+async function openQrFull(){
+  if (!curStudent) return;
+  const el = document.createElement('div');
+  el.className = 'qr-full'; el.id = 'qrFull'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'QR Code สำหรับสแกน');
+  el.innerHTML = `<div class="qf-code"></div><div class="qf-name">${esc(fullName(curStudent))}</div>
+    <div class="qf-meta">${esc(curStudent.cls)} · ${esc(curStudent.sid)}</div>
+    <div class="qf-hint">เพิ่มความสว่างหน้าจอให้สูงสุด · แตะที่ใดก็ได้เพื่อปิด</div>`;
+  document.body.appendChild(el);
+  drawQR($('.qf-code', el), qrPayload(curStudent), 360, '#000000');
+  el.addEventListener('click', closeQrFull);
+  try { if (el.requestFullscreen) await el.requestFullscreen(); } catch(e) {}
+  try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
+}
+function closeQrFull(){
+  const el = $('#qrFull'); if (el) el.remove();
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && $('#qrFull')) closeQrFull(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQrFull(); });
+$('#btnQrFull').addEventListener('click', openQrFull);
+document.addEventListener('click', e => { if (e.target.closest('[data-qr-full]')) openQrFull(); });
+/* Admin แก้ชื่อฐาน → วาดหน้าใหม่ */
+window.addEventListener('stations-updated', () => { lastKey = ''; if (me) login(me.sid, {silent:true}); });
 
 $('#brandEmblem').innerHTML = emblemSVG(false, 40);
 $('#minTxt').textContent = MIN;
@@ -178,6 +209,7 @@ function bindSurvey(s){
 }
 
 function render({student:s, checkins, surveyed}){
+  curStudent = s;
   const v = new Map(); checkins.forEach(c => v.set(c.st, c.ts));
   const n = v.size, ok = n >= MIN, left = Math.max(0, MIN - n);
   $('#loginView').hidden = true; $('#meView').hidden = false; $('#btnLogout').hidden = $('#btnRefresh').hidden = false;

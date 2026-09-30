@@ -496,3 +496,31 @@ table.data tbody tr[aria-selected="true"]{background:linear-gradient(90deg, rgba
 .verdict .v-icon{width:92px;height:92px;margin:0 auto;border-radius:28px;display:grid;place-items:center;font-size:40px}
 .verdict.ok .v-icon{color:#03140c;background:radial-gradient(circle at 35% 30%, #b8ffdc, var(--green) 55%, #0ea664);box-shadow:0 0 40px var(--green)}
 .verdict.bad .v-icon{color:#fff;background:radial-gradient(circle at 35% 30%, #ffb3c6, var(--red) 55%, #a80f3a);box-shadow:0 0 40px var(--red)}
+
+/* Station edit modal */
+.modal-back{position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:16px;background:rgba(2,3,10,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.modal{width:100%;max-width:560px;max-height:calc(100vh - 32px);overflow:auto;animation:resultIn .35s cubic-bezier(.2,1.3,.4,1)}
+
+/* Big screen: student status board */
+.board{display:grid;gap:14px}
+.board-tile{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:16px;min-width:0;height:104px;
+  background:linear-gradient(160deg, rgba(46,56,120,.42), rgba(12,15,38,.7));border:1px solid var(--line)}
+.board-tile.ok{border-color:rgba(57,255,159,.55);background:linear-gradient(160deg, rgba(57,255,159,.16), rgba(12,15,38,.7));box-shadow:0 0 24px -8px rgba(57,255,159,.6)}
+.board-tile.none{opacity:.55}
+.bt-name{font-family:var(--f-display);font-weight:600;font-size:clamp(15px,1.2vw,20px);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-meta{font-size:clamp(11px,.85vw,14px);color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-count{flex:none;text-align:right;font-family:var(--f-display);line-height:1}
+.bt-count b{font-size:clamp(28px,2.4vw,42px);font-variant-numeric:tabular-nums}
+.bt-count span{color:var(--ink-faint);font-size:clamp(13px,1vw,18px)}
+.bt-count svg{color:var(--green);filter:drop-shadow(0 0 8px var(--green));margin-right:6px;font-size:clamp(16px,1.4vw,24px)}
+.board-tile.ok .bt-count b{color:var(--green);text-shadow:0 0 16px rgba(57,255,159,.6)}
+.board-pages{display:flex;align-items:center;gap:8px;margin-top:18px}
+.board-pages > span:not(.scr-sub){width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.15)}
+.board-pages > span.on{background:var(--blue);box-shadow:0 0 10px var(--blue)}
+
+/* Student: full-screen QR for scanning */
+.qr-full{position:fixed;inset:0;z-index:99;background:#ffffff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));text-align:center;cursor:pointer}
+.qr-full .qf-code img{width:min(92vw, 68vh);height:min(92vw, 68vh);image-rendering:pixelated;display:block}
+.qr-full .qf-name{font-family:var(--f-display);font-weight:700;font-size:clamp(22px,6vw,36px);line-height:1.2}
+.qr-full .qf-meta{font-family:var(--f-mono);font-size:clamp(14px,4vw,20px);color:#444}
+.qr-full .qf-hint{font-size:13px;color:#777}
