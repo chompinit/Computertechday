@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=12">
+<link rel="stylesheet" href="shared.css?v=13">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -54,6 +54,11 @@
   </header>
 
   <main class="pt-6 pb-16">
+    <div class="glass loading-bar" id="loadingBar" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <div class="min-w-0"><b>กำลังโหลดข้อมูลจาก Google Sheets…</b>
+        <div class="text-sm muted">ครั้งแรกหลังไม่มีคนใช้สักพักอาจใช้ 10–20 วินาที หลังจากนั้นจะอัปเดตเองทุก 5 วินาที</div></div>
+    </div>
     <!-- ============ Dashboard ============ -->
     <section data-view="dashboard" class="view">
       <div class="flex flex-wrap items-end justify-between gap-4">
@@ -203,6 +208,11 @@
           <div class="grid md:grid-cols-2 gap-3 mt-5" id="links"></div>
         </div>
         <div class="flex flex-col gap-6 min-w-0">
+          <div class="glass panel-pad">
+            <h3 class="font-semibold text-lg"><i class="fa-solid fa-pen-to-square neon-blue"></i>&nbsp; แก้ไขชื่อฐาน / วิทยากร / ห้อง</h3>
+            <p class="text-sm muted mt-1">กดที่ฐานเพื่อแก้ไข ทุกเครื่องจะเห็นชื่อใหม่เมื่อโหลดหน้าครั้งถัดไป</p>
+            <div class="flex flex-col gap-2 mt-4" id="stEditList"></div>
+          </div>
           <div class="glass panel-pad" id="modePanel"></div>
           <div class="glass panel-pad">
             <h3 class="font-semibold text-lg"><i class="fa-solid fa-user-graduate neon-blue"></i>&nbsp; หน้าสำหรับนักเรียน</h3>
@@ -254,7 +264,7 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=12"></script>
+<script src="shared.js?v=13"></script>
 <script>
 (() => {
 const {parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
@@ -287,10 +297,13 @@ async function enter(){
   $('#gate').hidden = true; $('#app').hidden = false;
   $('#modeBadge').innerHTML = modeBadge();
   $$('.local-only').forEach(el => el.hidden = DB.mode !== 'local');
-  try { TOKENS = await DB.stationTokens() || {}; } catch(err) { toast({kind:'warn', title:'โหลดรหัสลิงก์ครูไม่ได้', body:esc(err.message)}); }
-  await refresh();
+  // แสดงเมนูและหน้าทันที แล้วค่อยโหลดข้อมูลตามมา (เซิร์ฟเวอร์ Google อาจตื่นช้าในครั้งแรก)
   const h = location.hash.slice(1);
   go(TABS.some(t => t.v === h) ? h : 'dashboard', false);
+  DB.stationTokens().then(t => { TOKENS = t || {}; keys.links = null; if (view === 'settings') renderSettings(); })
+    .catch(err => toast({kind:'warn', title:'โหลดรหัสลิงก์ครูไม่ได้', body:esc(err.message) + ' · กดรีเฟรชหน้าเพื่อลองใหม่'}));
+  await refresh();
+  $('#loadingBar').hidden = true;
   DB.subscribe(refresh);
   DB._onLocal = refresh;
 }
@@ -723,7 +736,13 @@ window.addEventListener('afterprint', () => { $('#printRoot').dataset.kind = '';
 let TOKENS = {};
 function teacherUrl(id){ return new URL(`teacher.html#st${id}${TOKENS[id] ? '-' + TOKENS[id] : ''}`, location.href).href; }
 function renderSettings(){
-  if (!unchanged('links', 1)) {
+  $('#stEditList').innerHTML = STATIONS.map(s => `<button class="next-st st-edit-row" data-edit-st="${s.id}" style="--h:${s.h}">
+    <div class="st-icon" style="width:34px;height:34px;font-size:14px;border-radius:10px"><i class="fa-solid ${s.icon}"></i></div>
+    <div class="min-w-0 flex-1 text-left"><div class="text-sm font-medium truncate">ฐานที่ ${s.id} · ${esc(s.name)}</div><div class="text-xs faint truncate">${esc(s.speaker)} · ${esc(s.room)}</div></div>
+    <i class="fa-solid fa-pen faint"></i></button>`).join('');
+  if (DB.mode === 'remote' && !Object.keys(TOKENS).length) {
+    $('#links').innerHTML = '<div class="empty md:col-span-2"><span class="spinner" aria-hidden="true"></span> กำลังโหลดลิงก์ครูพร้อมรหัสประจำฐาน…</div>';
+  } else if (!unchanged('links', Object.keys(TOKENS).length)) {
     $('#links').innerHTML = STATIONS.map(s => `<div class="link-card" style="--h:${s.h}">
       <div class="qrbox" data-link-qr="${s.id}"></div>
       <div class="min-w-0"><div class="flex items-center gap-2"><div class="st-icon" style="width:28px;height:28px;font-size:12px;border-radius:8px"><i class="fa-solid ${s.icon}"></i></div>
