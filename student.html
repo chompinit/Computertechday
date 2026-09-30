@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=11">
+<link rel="stylesheet" href="shared.css?v=12">
 <style>
   body{margin:0}
   .login{max-width:440px;margin-inline:auto}
@@ -98,7 +98,7 @@
 </div>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=11"></script>
+<script src="shared.js?v=12"></script>
 <script>
 (() => {
 const {SURVEY, CONFIG, STATIONS, ST, DB, $, esc, fullName, tFmt, store, parseQR, qrPayload, drawQR, decodeImageFile, toast, emblemSVG, gaugeSVG, mountPass, mountCertificate, prepareCertPrint} = CAI;
@@ -114,7 +114,7 @@ async function openQrFull(){
   el.className = 'qr-full'; el.id = 'qrFull'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'QR Code สำหรับสแกน');
   el.innerHTML = `<div class="qf-code"></div><div class="qf-name">${esc(fullName(curStudent))}</div>
     <div class="qf-meta">${esc(curStudent.cls)} · ${esc(curStudent.sid)}</div>
-    <div class="qf-hint">ยื่นจอให้ครูสแกน · เพิ่มความสว่างหน้าจอให้สูงสุด<br><b>แตะที่ใดก็ได้เพื่อดูฐานที่ผ่านแล้ว</b></div>`;
+    <div class="qf-hint">เพิ่มความสว่างหน้าจอให้สูงสุด · แตะที่ใดก็ได้เพื่อปิด</div>`;
   document.body.appendChild(el);
   drawQR($('.qf-code', el), qrPayload(curStudent), 360, '#000000');
   el.addEventListener('click', closeQrFull);
@@ -137,7 +137,7 @@ $('#brandEmblem').innerHTML = emblemSVG(false, 40);
 $('#minTxt').textContent = MIN;
 if (DB.mode === 'local') $('#demoHint').innerHTML = 'โหมดทดลอง: ถ้ายังไม่ได้นำเข้ารายชื่อจริง ลองเลข <span class="mono">65215</span> (ครบแล้ว) หรือ <span class="mono">65102</span> (ยังไม่ครบ)';
 
-async function login(sid, {silent = false, showQr = false} = {}){
+async function login(sid, {silent = false} = {}){
   const msg = $('#loginMsg');
   if (!silent) msg.textContent = 'กำลังค้นหา…';
   try {
@@ -146,7 +146,6 @@ async function login(sid, {silent = false, showQr = false} = {}){
     me = {sid}; store.set(KEY, me);
     msg.textContent = '';
     render(r);
-    if (showQr && !$('#qrFull')) openQrFull(); // เข้าระบบแล้วเด้ง QR กลางจอทันที
   } catch(err) {
     if (!silent) msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)} ลองใหม่อีกครั้ง</span>`;
     else toast({kind:'warn', title:'อัปเดตข้อมูลไม่ได้', body:esc(err.message)});
@@ -157,7 +156,7 @@ $('#loginForm').addEventListener('submit', e => {
   e.preventDefault();
   const sid = $('#sid').value.trim().toUpperCase();
   if (!/^[A-Z0-9]{4,6}$/.test(sid)) { $('#loginMsg').innerHTML = '<span style="color:var(--red)">กรอกเลขประจำตัวนักเรียน 4 หลัก</span>'; return; }
-  login(sid, {showQr:true});
+  login(sid);
 });
 /* ถ่ายรูป QR บนบัตร → ได้ทั้งรหัสและชื่อ ไม่ต้องพิมพ์ */
 $('#qrFile').addEventListener('change', async e => {
@@ -166,7 +165,7 @@ $('#qrFile').addEventListener('change', async e => {
     const q = parseQR(await decodeImageFile(f));
     if (!q || !q.name) throw new Error('QR นี้ไม่ใช่บัตรกิจกรรม');
     $('#sid').value = q.sid;
-    login(q.sid, {showQr:true});
+    login(q.sid);
   } catch(err) { $('#loginMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
 });
 $('#btnLogout').addEventListener('click', () => { store.set(KEY, null); $('#sid').value = ''; showLogin(); });
@@ -269,7 +268,7 @@ if (DB.mode === 'local') DB.subscribe(() => me && login(me.sid, {silent:true}));
 else setInterval(() => { if (me && !document.hidden) login(me.sid, {silent:true}); }, 20000);
 
 const saved = store.get(KEY, null);
-if (saved && saved.sid) { $('#sid').value = saved.sid; login(saved.sid, {silent:true, showQr:true}); }
+if (saved && saved.sid) { $('#sid').value = saved.sid; login(saved.sid, {silent:true}); }
 })();
 </script>
 </body>
