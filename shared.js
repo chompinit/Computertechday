@@ -114,7 +114,12 @@ let apiKey = store.sget('ttr-cai-admin-key') || '';
 
 /* err.network = true เมื่อส่งไม่ถึงเซิร์ฟเวอร์ (เน็ตหลุด / หมดเวลา / เซิร์ฟเวอร์ล่ม) → หน้าครูเก็บเข้าคิวรอส่ง */
 function netError(msg){ const e = new Error(msg); e.network = true; return e; }
-async function api(method, payload, timeoutMs = 12000){
+/* GET (อ่านข้อมูล) ลองซ้ำ 1 ครั้งถ้าเซิร์ฟเวอร์ Google ตื่นช้า (cold start) */
+async function api(method, payload, timeoutMs = 25000){
+  try { return await apiOnce(method, payload, timeoutMs); }
+  catch(e) { if (e.network && method === 'GET' && navigator.onLine) return apiOnce(method, payload, timeoutMs); throw e; }
+}
+async function apiOnce(method, payload, timeoutMs){
   const url = CONFIG.API_URL;
   if (!navigator.onLine) throw netError('ไม่มีอินเทอร์เน็ต');
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), timeoutMs);
