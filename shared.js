@@ -6,7 +6,7 @@
 const CONFIG = {
   // วาง URL ของ Google Apps Script Web App (ลงท้ายด้วย /exec) เพื่อให้ทุกเครื่องใช้ข้อมูลชุดเดียวกัน
   // เว้นว่าง '' = โหมดทดลอง เก็บข้อมูลในเบราว์เซอร์เครื่องนี้เท่านั้น
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbyE13dcZ3FvZ0NhCtMxHo3oyYrpbuBhTbt-CsVsgYfW_NZQjNIjkJ4jeJncdPRq1Tl-fA/exec',
   // PIN เข้าหน้า Admin ในโหมดทดลอง (โหมดออนไลน์ใช้ ADMIN_KEY ใน Code.gs แทน)
   LOCAL_ADMIN_PIN: '2569',
   MIN_STATIONS: 5,
