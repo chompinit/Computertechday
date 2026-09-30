@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ตรวจสอบเกียรติบัตร · Computer & AI Innovation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<link rel="stylesheet" href="shared.css?v=7">
+<style>body{margin:0}</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="bg-stars"></div><div class="bg-floor"></div></div>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<div class="mx-auto w-full max-w-[640px] px-4">
+  <header class="topbar">
+    <div class="topbar-inner glass">
+      <div class="brand"><span id="brandEmblem"></span>
+        <div class="min-w-0"><div class="brand-name">ตรวจสอบเกียรติบัตร</div><div class="brand-sub">Computer &amp; AI Innovation · โรงเรียนตันตรารักษ์</div></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="pt-6 pb-16 flex flex-col gap-6">
+    <div id="result"></div>
+    <form class="glass panel-pad flex flex-col gap-3" id="form" autocomplete="off">
+      <label for="code" class="text-sm muted">รหัสยืนยันเกียรติบัตร (มุมขวาล่างของเกียรติบัตร)</label>
+      <div class="flex gap-2">
+        <input class="input mono uppercase" id="code" placeholder="TTR-CAI-69-XXXXX-XXXXX" spellcheck="false">
+        <button class="btn btn-primary" aria-label="ตรวจสอบ"><i class="fa-solid fa-magnifying-glass"></i></button>
+      </div>
+      <label class="btn btn-ghost" for="qrFile"><i class="fa-solid fa-qrcode"></i> ถ่ายรูป QR บนเกียรติบัตร</label>
+      <input type="file" id="qrFile" accept="image/*" capture="environment" hidden>
+    </form>
+  </main>
+</div>
+
+<script src="shared.js?v=7"></script>
+<script>
+(() => {
+const {DB, $, esc, emblemSVG, decodeImageFile, CONFIG} = CAI;
+$('#brandEmblem').innerHTML = emblemSVG(false, 40);
+
+function idle(){
+  $('#result').innerHTML = `<div class="glass verdict"><div class="v-icon" style="background:rgba(255,255,255,.05);color:var(--blue);box-shadow:none;border:1px solid var(--line)"><i class="fa-solid fa-shield-halved"></i></div>
+    <h1 class="text-2xl font-bold mt-5">ตรวจสอบว่าเกียรติบัตรเป็นของจริง</h1><p class="muted mt-2">สแกน QR บนเกียรติบัตร หรือกรอกรหัสยืนยันด้านล่าง</p></div>`;
+}
+async function check(code){
+  code = String(code || '').trim().toUpperCase();
+  if (!code) return idle();
+  $('#code').value = code;
+  $('#result').innerHTML = '<div class="glass verdict"><p class="muted">กำลังตรวจสอบ…</p></div>';
+  try {
+    const r = await DB.verify(code);
+    if (r.valid) {
+      $('#result').innerHTML = `<div class="glass verdict ok"><div class="v-icon"><i class="fa-solid fa-check"></i></div>
+        <div class="pill pill-green mt-5"><i class="fa-solid fa-circle-check"></i> เกียรติบัตรนี้ถูกต้อง</div>
+        <h1 class="text-3xl font-bold mt-4 break-words" style="font-family:var(--f-display)">${esc(r.name)}</h1>
+        <p class="muted mt-1">${esc(r.cls)}</p>
+        <p class="mt-4">ผ่านฐานกิจกรรม <b class="neon-green">${r.count} ฐาน</b> ในงาน Computer &amp; AI Innovation<br>โรงเรียนตันตรารักษ์ (เกณฑ์ ${CONFIG.MIN_STATIONS} ฐาน)</p>
+        <p class="mono text-xs faint mt-4">${esc(code)}</p></div>`;
+    } else {
+      const why = r.reason === 'not_eligible' ? 'รหัสนี้เป็นของนักเรียนในระบบ แต่ยังเข้าฐานไม่ครบตามเกณฑ์' : 'ไม่พบรหัสนี้ในระบบ ตรวจสอบตัวอักษรอีกครั้ง หรือเกียรติบัตรอาจไม่ได้ออกโดยระบบนี้';
+      $('#result').innerHTML = `<div class="glass verdict bad"><div class="v-icon"><i class="fa-solid fa-xmark"></i></div>
+        <h1 class="text-2xl font-bold mt-5">ตรวจสอบไม่ผ่าน</h1><p class="muted mt-2">${why}</p><p class="mono text-xs faint mt-4">${esc(code)}</p></div>`;
+    }
+  } catch(err) {
+    $('#result').innerHTML = `<div class="glass verdict bad"><div class="v-icon"><i class="fa-solid fa-wifi"></i></div><h1 class="text-xl font-bold mt-5">ตรวจสอบไม่ได้ตอนนี้</h1><p class="muted mt-2">${esc(err.message)} ลองใหม่อีกครั้ง</p></div>`;
+  }
+}
+$('#form').addEventListener('submit', e => { e.preventDefault(); check($('#code').value); });
+$('#qrFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const text = await decodeImageFile(f); const m = text.match(/TTR-CAI-69-[0-9A-Z]+-[0-9A-Z]{5}/i); if (!m) throw new Error('QR นี้ไม่ใช่ของเกียรติบัตร'); check(m[0]); }
+  catch(err) { toast({kind:'err', title:'อ่าน QR ไม่สำเร็จ', body:esc(err.message)}); }
+});
+const toast = CAI.toast;
+window.addEventListener('hashchange', () => check(decodeURIComponent(location.hash.slice(1))));
+location.hash.length > 1 ? check(decodeURIComponent(location.hash.slice(1))) : idle();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ฐานของฉัน · Computer & AI Innovation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&family=Noto+Serif+Thai:wght@400;600;700&family=Cinzel:wght@600;700&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<link rel="stylesheet" href="shared.css?v=7">
+<style>
+  body{margin:0}
+  .login{max-width:440px;margin-inline:auto}
+  .next-st{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);min-width:0}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="bg-stars"></div><div class="bg-floor"></div></div>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<div class="mx-auto w-full max-w-[1100px] px-4 md:px-6">
+  <header class="topbar">
+    <div class="topbar-inner glass">
+      <div class="brand">
+        <span id="brandEmblem"></span>
+        <div class="min-w-0">
+          <div class="brand-name">ฐานของฉัน</div>
+          <div class="brand-sub">Computer &amp; AI Innovation · โรงเรียนตันตรารักษ์</div>
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <button class="btn btn-ghost btn-sm" id="btnRefresh" hidden aria-label="โหลดข้อมูลใหม่"><i class="fa-solid fa-rotate"></i></button>
+        <button class="btn btn-ghost btn-sm" id="btnLogout" hidden><i class="fa-solid fa-right-from-bracket"></i> ออก</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="pt-6 pb-16">
+    <!-- ============ Login ============ -->
+    <section id="loginView">
+      <div class="text-center py-6">
+        <div class="eyebrow">Student Check</div>
+        <h1 class="text-3xl md:text-4xl font-bold mt-2"><span class="grad-text">ดูฐานที่ผ่านแล้ว</span><br>และรับเกียรติบัตร</h1>
+        <p class="muted mt-3">เข้าครบ <b class="neon-green" id="minTxt"></b> ฐานขึ้นไป ดาวน์โหลดเกียรติบัตรได้ทันที</p>
+      </div>
+      <form class="login glass panel-pad flex flex-col gap-4" id="loginForm" autocomplete="off" novalidate>
+        <div class="field"><label for="sid">เลขประจำตัวนักเรียน 4 หลัก</label><input class="input mono pin-input" id="sid" inputmode="numeric" maxlength="5" placeholder="0000" autocomplete="off"></div>
+        <p class="text-sm min-h-[1.4em]" id="loginMsg" role="status"></p>
+        <button class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> ดูความคืบหน้า</button>
+        <div class="flex items-center gap-3 text-xs faint"><span class="hr flex-1"></span>หรือ<span class="hr flex-1"></span></div>
+        <label class="btn btn-ghost" for="qrFile"><i class="fa-solid fa-qrcode"></i> ถ่ายรูป QR บนบัตรของฉัน</label>
+        <input type="file" id="qrFile" accept="image/*" capture="environment" hidden>
+        <p class="text-xs faint" id="demoHint"></p>
+      </form>
+    </section>
+
+    <!-- ============ My progress ============ -->
+    <section id="meView" hidden>
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div class="min-w-0"><div class="eyebrow">สวัสดี</div><h1 class="text-3xl md:text-4xl font-bold mt-1 break-words" id="meName"></h1><div class="muted mono text-sm mt-1" id="meMeta"></div></div>
+        <span class="text-xs faint" id="updated"></span>
+      </div>
+
+      <div class="grid lg:grid-cols-[340px_1fr] gap-6 mt-6">
+        <div class="glass panel-pad min-w-0" id="gaugePanel"></div>
+        <div class="glass panel-pad min-w-0">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="font-semibold text-lg">ฐานกิจกรรมทั้งหมด</h2>
+            <div class="flex gap-2" id="badgeCounts"></div>
+          </div>
+          <div class="badges mt-5" id="badges"></div>
+        </div>
+      </div>
+
+      <div class="mt-6" id="certSection"></div>
+
+      <div class="grid lg:grid-cols-2 gap-6 mt-6">
+        <div class="min-w-0">
+          <h2 class="h-sec mb-1">บัตร QR ของฉัน</h2>
+          <p class="text-sm muted mb-4">ลืมบัตร? เปิดหน้านี้แล้วยื่นจอให้ครูประจำฐานสแกนได้เลย</p>
+          <div id="passHolder"></div>
+        </div>
+        <div class="glass panel-pad min-w-0">
+          <h2 class="font-semibold text-lg">เส้นทางของฉันวันนี้</h2>
+          <div class="timeline mt-4" id="timeline"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="printRoot"></div>
+
+<script src="shared.js?v=7"></script>
+<script>
+(() => {
+const {SURVEY, CONFIG, STATIONS, ST, DB, $, esc, fullName, tFmt, store, parseQR, decodeImageFile, toast, emblemSVG, gaugeSVG, mountPass, mountCertificate, prepareCertPrint} = CAI;
+const MIN = CONFIG.MIN_STATIONS;
+const KEY = 'ttr-student-login';
+let me = null, lastKey = '';
+
+$('#brandEmblem').innerHTML = emblemSVG(false, 40);
+$('#minTxt').textContent = MIN;
+if (DB.mode === 'local') $('#demoHint').innerHTML = 'โหมดทดลอง: ถ้ายังไม่ได้นำเข้ารายชื่อจริง ลองเลข <span class="mono">65215</span> (ครบแล้ว) หรือ <span class="mono">65102</span> (ยังไม่ครบ)';
+
+async function login(sid, {silent = false} = {}){
+  const msg = $('#loginMsg');
+  if (!silent) msg.textContent = 'กำลังค้นหา…';
+  try {
+    const r = await DB.studentView(sid);
+    if (!r) { if (!silent) msg.innerHTML = '<span style="color:var(--red)">ไม่พบเลขประจำตัวนี้ ตรวจสอบตัวเลขอีกครั้ง</span>'; store.set(KEY, null); showLogin(); return; }
+    me = {sid}; store.set(KEY, me);
+    msg.textContent = '';
+    render(r);
+  } catch(err) {
+    if (!silent) msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)} ลองใหม่อีกครั้ง</span>`;
+    else toast({kind:'warn', title:'อัปเดตข้อมูลไม่ได้', body:esc(err.message)});
+  }
+}
+function showLogin(){ me = null; lastKey = ''; $('#loginView').hidden = false; $('#meView').hidden = true; $('#btnLogout').hidden = $('#btnRefresh').hidden = true; }
+$('#loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const sid = $('#sid').value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,6}$/.test(sid)) { $('#loginMsg').innerHTML = '<span style="color:var(--red)">กรอกเลขประจำตัวนักเรียน 4 หลัก</span>'; return; }
+  login(sid);
+});
+/* ถ่ายรูป QR บนบัตร → ได้ทั้งรหัสและชื่อ ไม่ต้องพิมพ์ */
+$('#qrFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const q = parseQR(await decodeImageFile(f));
+    if (!q || !q.name) throw new Error('QR นี้ไม่ใช่บัตรกิจกรรม');
+    $('#sid').value = q.sid;
+    login(q.sid);
+  } catch(err) { $('#loginMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
+});
+$('#btnLogout').addEventListener('click', () => { store.set(KEY, null); $('#sid').value = ''; showLogin(); });
+$('#btnRefresh').addEventListener('click', () => me && login(me.sid, {silent:true}));
+
+/* แบบประเมินก่อนรับเกียรติบัตร */
+function surveyHTML(v){
+  return `<div class="glass panel-pad" style="border-color:rgba(57,255,159,.45)">
+    <div class="flex flex-wrap items-center gap-3"><span class="pill pill-green"><i class="fa-solid fa-award"></i> ครบเงื่อนไขแล้ว</span>
+      <h2 class="h-sec">ตอบแบบประเมินสั้นๆ แล้วรับเกียรติบัตร</h2></div>
+    <p class="text-sm muted mt-1">ใช้เวลาไม่ถึง 1 นาที คะแนน 1 = น้อยที่สุด, 5 = มากที่สุด</p>
+    <form id="surveyForm" class="mt-2" novalidate>
+      ${SURVEY.map((q, i) => `<div class="survey-q"><div class="font-medium">${i + 1}. ${esc(q.text)}</div>
+        <div class="rating" role="group" aria-label="${esc(q.text)}" data-q="${q.id}">${[1,2,3,4,5].map(n => `<button type="button" data-v="${n}" aria-pressed="false">${n}</button>`).join('')}</div></div>`).join('')}
+      <div class="survey-q"><label class="font-medium" for="svFav">${SURVEY.length + 1}. ฐานที่ชอบที่สุด</label>
+        <select class="input" id="svFav"><option value="">เลือกฐาน</option>${STATIONS.filter(st => v.has(st.id)).map(st => `<option value="${st.id}">ฐานที่ ${st.id} · ${esc(st.name)}</option>`).join('')}</select></div>
+      <div class="survey-q" style="border:0"><label class="font-medium" for="svComment">ข้อเสนอแนะ (ไม่บังคับ)</label>
+        <textarea class="input" id="svComment" rows="3" maxlength="500" placeholder="อยากให้ปีหน้ามีฐานอะไรเพิ่ม หรือชอบอะไรเป็นพิเศษ"></textarea></div>
+      <p class="text-sm min-h-[1.4em]" id="svMsg" role="status"></p>
+      <button class="btn btn-gold"><i class="fa-solid fa-paper-plane"></i> ส่งแบบประเมินและรับเกียรติบัตร</button>
+    </form></div>`;
+}
+function bindSurvey(s){
+  const form = $('#surveyForm'), answers = {};
+  form.addEventListener('click', e => {
+    const b = e.target.closest('.rating button'); if (!b) return;
+    const g = b.parentElement; answers[g.dataset.q] = +b.dataset.v;
+    [...g.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const missing = SURVEY.filter(q => !answers[q.id]);
+    if (missing.length) { $('#svMsg').innerHTML = `<span style="color:var(--red)">ให้คะแนนให้ครบทุกข้อ (ยังขาด ${missing.length} ข้อ)</span>`; return; }
+    $('#svMsg').textContent = 'กำลังส่ง…';
+    try {
+      await DB.survey(me.sid, {...answers, fav:$('#svFav').value, comment:$('#svComment').value.trim()});
+      toast({title:'ขอบคุณที่ตอบแบบประเมิน', body:'ดาวน์โหลดเกียรติบัตรได้เลย', icon:'fa-award'});
+      lastKey = ''; login(me.sid, {silent:true});
+    } catch(err) { $('#svMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)} ลองอีกครั้ง</span>`; }
+  });
+}
+
+function render({student:s, checkins, surveyed}){
+  const v = new Map(); checkins.forEach(c => v.set(c.st, c.ts));
+  const n = v.size, ok = n >= MIN, left = Math.max(0, MIN - n);
+  $('#loginView').hidden = true; $('#meView').hidden = false; $('#btnLogout').hidden = $('#btnRefresh').hidden = false;
+  $('#updated').textContent = 'อัปเดตล่าสุด ' + tFmt(Date.now());
+  const key = s.sid + ':' + [...v.keys()].sort().join(',') + ':' + !!surveyed;
+  if (key === lastKey) return; lastKey = key;
+
+  $('#meName').textContent = fullName(s);
+  $('#meMeta').textContent = `${s.cls} · รหัส ${s.sid}`;
+  const todo = STATIONS.filter(st => !v.has(st.id));
+  $('#gaugePanel').innerHTML = `
+    <div class="gauge"><div class="gauge-disc"></div>${gaugeSVG(v)}
+      <div class="center"><div><div class="big">${n}<small>/${STATIONS.length}</small></div><div class="text-xs muted mt-1">ฐานที่ผ่านแล้ว</div></div></div></div>
+    <div class="mt-6">
+      <div class="flex justify-between text-sm mb-2"><span>เป้าหมายเกียรติบัตร</span><span class="mono">${Math.min(n, MIN)}/${MIN}</span></div>
+      <div class="bar3d ${ok?'done':''}"><i style="width:${Math.min(100, n / MIN * 100)}%"></i></div>
+      <p class="mt-3 text-center ${ok?'neon-green':''}" style="font-family:var(--f-display);font-weight:600">
+        ${ok ? '<i class="fa-solid fa-unlock"></i> ปลดล็อกเกียรติบัตรแล้ว' : `ขาดอีก ${left} ฐาน จะได้รับเกียรติบัตร`}</p>
+    </div>
+    ${todo.length ? `<div class="hr my-5"></div><div class="text-sm muted mb-3">${ok ? 'ยังมีฐานให้ลองอีก' : 'ฐานที่ยังไม่ได้เข้า'}</div>
+      <div class="flex flex-col gap-2">${todo.map(st => `<div class="next-st" style="--h:${st.h}"><div class="st-icon" style="width:34px;height:34px;font-size:14px;border-radius:10px"><i class="fa-solid ${st.icon}"></i></div>
+        <div class="min-w-0"><div class="text-sm font-medium truncate">ฐานที่ ${st.id} · ${esc(st.name)}</div><div class="text-xs faint truncate">${esc(st.room)}</div></div></div>`).join('')}</div>` : ''}`;
+
+  $('#badgeCounts').innerHTML = `<span class="pill pill-green">ผ่าน ${n}</span><span class="pill pill-dim">ยังไม่เข้า ${STATIONS.length - n}</span>`;
+  $('#badges').innerHTML = STATIONS.map(st => { const on = v.has(st.id);
+    return `<div class="badge ${on?'':'off'}" style="--h:${st.h}">
+      ${on ? '<span class="ok"><i class="fa-solid fa-check"></i></span>' : ''}
+      <div class="hex-wrap"><div class="hex"><i class="fa-solid ${on ? st.icon : 'fa-lock'}"></i></div></div>
+      <div class="b-name">${esc(st.name)}</div>
+      <div class="b-sub">${on ? `ผ่านเมื่อ ${tFmt(v.get(st.id))}` : `ฐานที่ ${st.id} · ${esc(st.room)}`}</div></div>`; }).join('');
+
+  const cs = $('#certSection');
+  if (ok && CONFIG.REQUIRE_SURVEY && !surveyed) {
+    cs.innerHTML = surveyHTML(v);
+    bindSurvey(s);
+  } else if (ok) {
+    cs.innerHTML = `<div class="flex items-center gap-3 mb-4"><h2 class="h-sec">เกียรติบัตรของฉัน</h2><span class="pill pill-green"><i class="fa-solid fa-award"></i> พร้อมดาวน์โหลด</span></div><div id="certOut"></div>`;
+    mountCertificate($('#certOut'), s, v);
+  } else {
+    cs.innerHTML = `<div class="glass lock-hero"><div class="lock-3d"><i class="fa-solid fa-lock"></i></div>
+      <h2 class="text-2xl font-bold">เกียรติบัตรยังล็อกอยู่</h2>
+      <p class="muted max-w-[30em]">เข้าอีก <b class="neon-blue">${left} ฐาน</b> แล้วกลับมาหน้านี้ ปุ่มดาวน์โหลดเกียรติบัตรจะขึ้นให้ทันที</p></div>`;
+  }
+
+  mountPass($('#passHolder'), s, v);
+  const tl = [...v.entries()].sort((a,b) => a[1] - b[1]);
+  $('#timeline').innerHTML = tl.length ? tl.map(([id, ts]) => `<div class="tl-item" style="--h:${ST[id].h}">
+    <span class="mono text-xs muted">${tFmt(ts)}</span><span class="tl-dot"></span>
+    <span class="min-w-0 truncate">ฐานที่ ${id} · ${esc(ST[id].name)} <span class="faint text-xs">${esc(ST[id].th)}</span></span></div>`).join('')
+    : '<div class="empty">ยังไม่ได้เข้าฐานใด เริ่มจากฐานที่ใกล้ที่สุดได้เลย</div>';
+}
+window.addEventListener('beforeprint', () => { if ($('#certificate')) prepareCertPrint(); });
+
+/* อัปเดตอัตโนมัติ: โหมดทดลองอัปเดตทันที, โหมดออนไลน์ทุก 20 วินาที */
+if (DB.mode === 'local') DB.subscribe(() => me && login(me.sid, {silent:true}));
+else setInterval(() => { if (me && !document.hidden) login(me.sid, {silent:true}); }, 20000);
+
+const saved = store.get(KEY, null);
+if (saved && saved.sid) { $('#sid').value = saved.sid; login(saved.sid, {silent:true}); }
+})();
+</script>
+</body>
+</html>

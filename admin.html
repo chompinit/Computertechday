@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Computer & AI Innovation Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&family=Noto+Serif+Thai:wght@400;600;700&family=Cinzel:wght@600;700&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<link rel="stylesheet" href="shared.css?v=7">
+<style>body{margin:0}</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="bg-stars"></div><div class="bg-floor"></div></div>
+<div class="flash" id="flash" aria-hidden="true"></div>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<!-- ============ Login gate ============ -->
+<div class="gate" id="gate">
+  <form class="gate-card glass panel-pad" id="gateForm" autocomplete="off">
+    <div class="flex justify-center" id="gateEmblem"></div>
+    <div class="eyebrow mt-4">Admin Console</div>
+    <h1 class="text-2xl font-bold mt-1">Computer &amp; AI Innovation</h1>
+    <p class="muted text-sm mt-1">โรงเรียนตันตรารักษ์ · สำหรับผู้ดูแลระบบเท่านั้น</p>
+    <input class="input pin-input mt-6" id="pin" type="password" inputmode="numeric" placeholder="••••" aria-label="รหัสผู้ดูแล" autofocus>
+    <p class="text-sm mt-3 min-h-[1.4em]" id="gateMsg" role="status"></p>
+    <button class="btn btn-primary w-full mt-2"><i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
+    <p class="text-xs faint mt-4" id="gateHint"></p>
+  </form>
+</div>
+
+<div class="mx-auto w-full max-w-[1260px] px-4 md:px-6" id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-inner glass flex-wrap">
+      <div class="brand">
+        <span id="brandEmblem"></span>
+        <div class="min-w-0">
+          <div class="brand-name">Computer <span class="neon-blue">&amp;</span> AI Innovation <span class="faint">· Admin</span></div>
+          <div class="brand-sub">โรงเรียนตันตรารักษ์ · ศูนย์ควบคุมฐานกิจกรรม</div>
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-2 flex-wrap">
+        <span id="modeBadge"></span>
+        <a class="btn btn-ghost btn-sm" href="teacher.html" target="_blank" rel="noopener"><i class="fa-solid fa-qrcode"></i> หน้าครูสแกน</a>
+        <a class="btn btn-ghost btn-sm" href="student.html" target="_blank" rel="noopener"><i class="fa-solid fa-user-graduate"></i> หน้านักเรียน</a>
+        <button class="btn btn-ghost btn-sm" id="btnLogout" aria-label="ออกจากระบบ"><i class="fa-solid fa-right-from-bracket"></i></button>
+      </div>
+    </div>
+    <nav class="tabbar mt-3 glass" id="tabs" aria-label="เมนูผู้ดูแล"></nav>
+  </header>
+
+  <main class="pt-6 pb-16">
+    <!-- ============ Dashboard ============ -->
+    <section data-view="dashboard" class="view">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div><div class="eyebrow">Live Dashboard</div><h2 class="text-3xl md:text-4xl font-bold mt-1">ภาพรวมงานวันนี้</h2></div>
+        <div class="glass px-4 py-3 flex items-center gap-3">
+          <span class="live-dot" id="liveDot"></span><span class="text-sm" id="liveText">อัปเดตอัตโนมัติ</span>
+        </div>
+        <button class="btn btn-purple" id="btnScreen"><i class="fa-solid fa-display"></i> โหมดจอใหญ่</button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6" id="kpis"></div>
+      <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-5 mt-6" id="ovCards"></div>
+      <div class="grid lg:grid-cols-3 gap-6 mt-6">
+        <div class="glass panel-pad min-w-0">
+          <h3 class="font-semibold text-lg"><i class="fa-solid fa-trophy" style="color:var(--gold)"></i>&nbsp; ห้องที่ร่วมกิจกรรมมากที่สุด</h3>
+          <p class="text-xs faint mt-1">นับการเช็กอินทั้งหมดของนักเรียนในห้อง</p>
+          <div class="flex flex-col gap-3 mt-4" id="lbClass"></div>
+        </div>
+        <div class="glass panel-pad min-w-0">
+          <h3 class="font-semibold text-lg"><i class="fa-solid fa-rocket neon-blue"></i>&nbsp; นักสำรวจตัวท็อป</h3>
+          <p class="text-xs faint mt-1">เข้าฐานมากที่สุด เสมอกันดูจากใครครบก่อน</p>
+          <div class="flex flex-col gap-3 mt-4" id="lbStudents"></div>
+        </div>
+        <div class="glass panel-pad min-w-0">
+          <h3 class="font-semibold text-lg"><i class="fa-solid fa-tower-broadcast neon-green"></i>&nbsp; ความเคลื่อนไหวล่าสุด</h3>
+          <div class="flex flex-col mt-3" id="feed"></div>
+        </div>
+      </div>
+      <div class="glass panel-pad mt-6" id="surveyPanel"></div>
+    </section>
+
+    <!-- ============ Students ============ -->
+    <section data-view="students" class="view" hidden>
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div><div class="eyebrow">Student Status</div><h2 class="text-3xl md:text-4xl font-bold mt-1">สถานะนักเรียนรายคน</h2></div>
+        <button class="btn btn-ghost btn-sm" id="btnCsv"><i class="fa-solid fa-file-csv"></i> ส่งออก CSV</button>
+      </div>
+      <div class="glass panel-pad mt-6 flex flex-wrap gap-3 items-center">
+        <div class="flex-1 min-w-[200px] relative">
+          <input class="input pl-10" id="fQuery" placeholder="ค้นหารหัส หรือชื่อ">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 faint"></i>
+        </div>
+        <select class="input w-auto" id="fClass" aria-label="กรองตามห้อง"></select>
+        <select class="input w-auto" id="fStatus" aria-label="กรองตามสถานะ">
+          <option value="all">ทุกสถานะ</option><option value="done">ได้เกียรติบัตรแล้ว</option><option value="doing">กำลังเก็บฐาน</option><option value="none">ยังไม่เข้าฐานใด</option>
+        </select>
+        <label class="btn btn-ghost btn-sm" for="fQr"><i class="fa-solid fa-qrcode"></i> ค้นจากรูป QR</label>
+        <input type="file" id="fQr" accept="image/*" hidden>
+      </div>
+      <div class="grid xl:grid-cols-[1fr_400px] gap-6 mt-6">
+        <div class="min-w-0">
+          <div class="flex justify-between items-center text-sm muted mb-2"><span id="rowCount"></span><span class="faint text-xs">คลิกแถวเพื่อดูรายละเอียด</span></div>
+          <div class="table-wrap glass" style="max-height:70vh"><table class="data"><thead><tr>
+            <th>รหัส</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ฐานที่ผ่าน</th><th class="text-right">รวม</th><th>สถานะ</th>
+          </tr></thead><tbody id="rows"></tbody></table></div>
+        </div>
+        <aside class="min-w-0" id="detail"></aside>
+      </div>
+    </section>
+
+    <!-- ============ Register & cards ============ -->
+    <section data-view="register" class="view" hidden>
+      <div><div class="eyebrow">Registration &amp; QR Cards</div><h2 class="text-3xl md:text-4xl font-bold mt-1">ลงทะเบียนและบัตร QR</h2></div>
+      <div class="grid lg:grid-cols-2 gap-6 mt-6">
+        <div class="flex flex-col gap-6 min-w-0">
+          <div class="glass panel-pad">
+            <h3 class="h-sec">ลงทะเบียนรายคน</h3>
+            <form id="regForm" class="mt-5 grid grid-cols-2 gap-4" autocomplete="off" novalidate>
+              <div class="field col-span-2 sm:col-span-1"><label for="rSid">รหัสประจำตัวนักเรียน</label><input class="input mono" id="rSid" inputmode="numeric" maxlength="10" placeholder="เช่น 66123"></div>
+              <div class="field col-span-2 sm:col-span-1"><label for="rPrefix">คำนำหน้า</label><select class="input" id="rPrefix"><option>ด.ช.</option><option>ด.ญ.</option><option>นาย</option><option>นางสาว</option></select></div>
+              <div class="field col-span-2 sm:col-span-1"><label for="rFirst">ชื่อ</label><input class="input" id="rFirst" placeholder="ชื่อจริง"></div>
+              <div class="field col-span-2 sm:col-span-1"><label for="rLast">นามสกุล</label><input class="input" id="rLast" placeholder="นามสกุล"></div>
+              <div class="field"><label for="rLevel">ระดับชั้น</label><select class="input" id="rLevel"><option>ป.1</option><option>ป.2</option><option>ป.3</option><option>ป.4</option><option>ป.5</option><option>ป.6</option><option>ม.1</option><option>ม.2</option><option>ม.3</option><option>ม.4</option><option>ม.5</option><option>ม.6</option></select></div>
+              <div class="field"><label for="rRoom">ห้อง</label><input class="input" id="rRoom" maxlength="30" value="1" placeholder="เช่น 1 หรือ 2 EP"></div>
+              <p class="col-span-2 text-sm min-h-[1.4em]" id="regMsg" role="status"></p>
+              <div class="col-span-2"><button class="btn btn-purple"><i class="fa-solid fa-wand-magic-sparkles"></i> สร้างบัตรและ QR Code</button></div>
+            </form>
+          </div>
+          <div class="glass panel-pad">
+            <h3 class="h-sec">นำเข้าหลายคน</h3>
+            <p class="text-sm muted mt-1">อัปโหลดไฟล์ <b>รายงานรายชื่อนักเรียน (.xlsx)</b> จากระบบทะเบียนได้เลย ระบบจะข้ามชั้นอนุบาลและนักเรียนที่ลาออก/จำหน่ายให้อัตโนมัติ</p>
+            <div class="flex flex-wrap items-center gap-3 mt-4">
+              <label class="btn btn-primary" for="xlsxFile"><i class="fa-solid fa-file-excel"></i> เลือกไฟล์ Excel</label>
+              <input type="file" id="xlsxFile" accept=".xlsx,.xls,.csv" hidden>
+              <span class="text-sm" id="xlsxMsg" role="status"></span>
+            </div>
+            <div class="hr my-5"></div>
+            <p class="text-sm muted">หรือคัดลอกมาวาง บรรทัดละ 1 คน เรียงคอลัมน์: <span class="mono">รหัส, คำนำหน้า, ชื่อ, นามสกุล, ชั้น</span></p>
+            <textarea class="input mono mt-4" id="bulk" rows="6" placeholder="66201	ด.ญ.	สุภาวดี	ใจงาม	ม.1/3&#10;66202	ด.ช.	ภาณุพงศ์	ศรีทอง	ม.1/3"></textarea>
+            <div class="flex flex-wrap items-center gap-3 mt-4">
+              <button class="btn btn-ghost" id="btnImport"><i class="fa-solid fa-file-import"></i> นำเข้า</button>
+              <span class="text-sm" id="bulkMsg" role="status"></span>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-col gap-6 min-w-0">
+          <div>
+            <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
+              <h3 class="h-sec">บัตร Station Pass</h3>
+              <div class="flex gap-2"><input class="input mono w-[150px]" id="passQuery" list="studentList" placeholder="รหัสนักเรียน" aria-label="เลือกนักเรียน"></div>
+            </div>
+            <div id="passHolder"></div>
+            <div class="flex flex-wrap gap-3 justify-center mt-4">
+              <button class="btn btn-ghost btn-sm" id="btnPassPng"><i class="fa-solid fa-image"></i> บันทึกบัตร (PNG)</button>
+            </div>
+          </div>
+          <div class="glass panel-pad">
+            <h3 class="h-sec">พิมพ์บัตร QR ทั้งห้อง</h3>
+            <p class="text-sm muted mt-1">กระดาษ A4 แนวตั้ง 3 คอลัมน์ ตัดแจกนักเรียนได้ทันที</p>
+            <div class="flex flex-wrap gap-3 mt-4">
+              <select class="input w-auto" id="sheetClass" aria-label="เลือกห้อง"></select>
+              <button class="btn btn-gold" id="btnSheet"><i class="fa-solid fa-print"></i> พิมพ์บัตร</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Certificate ============ -->
+    <section data-view="cert" class="view" hidden>
+      <div><div class="eyebrow">E-Certificate</div><h2 class="text-3xl md:text-4xl font-bold mt-1">เกียรติบัตรออนไลน์</h2>
+        <p class="muted mt-1">ระบบตรวจเงื่อนไขอัตโนมัติ ต้องเข้าฐานครบอย่างน้อย <span id="minTxt"></span> ฐาน</p></div>
+      <div class="grid lg:grid-cols-[320px_1fr] gap-6 mt-6">
+        <div class="flex flex-col gap-6 min-w-0">
+          <div class="glass panel-pad">
+            <form id="certForm" class="flex flex-col gap-3" autocomplete="off">
+              <label for="certQuery" class="text-sm muted">รหัสนักเรียน</label>
+              <div class="flex gap-2"><input class="input mono" id="certQuery" list="studentList" placeholder="เช่น 65101"><button class="btn btn-primary" aria-label="ตรวจสอบ"><i class="fa-solid fa-arrow-right"></i></button></div>
+            </form>
+          </div>
+          <div class="glass panel-pad" id="certChecks"></div>
+        </div>
+        <div class="min-w-0" id="certOut"></div>
+      </div>
+    </section>
+
+    <!-- ============ Settings ============ -->
+    <section data-view="settings" class="view" hidden>
+      <div><div class="eyebrow">Settings &amp; Teacher Links</div><h2 class="text-3xl md:text-4xl font-bold mt-1">ตั้งค่าและลิงก์สำหรับครู</h2></div>
+      <div class="grid lg:grid-cols-[1fr_380px] gap-6 mt-6">
+        <div class="glass panel-pad min-w-0">
+          <h3 class="h-sec">ลิงก์สแกนประจำแต่ละฐาน</h3>
+          <p class="text-sm muted mt-1">ส่งลิงก์หรือให้ครูสแกน QR นี้ หน้าครูจะเลือกฐานให้อัตโนมัติ ลิงก์มีรหัสกำกับของแต่ละฐาน คนที่ไม่มีลิงก์จึงบันทึกเช็กอินไม่ได้ ครูเห็นเฉพาะหน้าสแกน ไม่เห็นข้อมูลภาพรวม</p>
+          <button class="btn btn-gold btn-sm mt-4" id="btnPoster"><i class="fa-solid fa-print"></i> พิมพ์ป้าย QR ทุกฐาน</button>
+          <div class="grid md:grid-cols-2 gap-3 mt-5" id="links"></div>
+        </div>
+        <div class="flex flex-col gap-6 min-w-0">
+          <div class="glass panel-pad" id="modePanel"></div>
+          <div class="glass panel-pad">
+            <h3 class="font-semibold text-lg"><i class="fa-solid fa-user-graduate neon-blue"></i>&nbsp; หน้าสำหรับนักเรียน</h3>
+            <p class="text-sm muted mt-1">ติด QR นี้ไว้หน้างาน นักเรียนสแกนแล้วกรอกรหัสกับชื่อจริง เพื่อดูฐานที่ผ่านแล้วและดาวน์โหลดเกียรติบัตรเอง</p>
+            <div class="link-card mt-4"><div class="qrbox" id="studentQr"></div>
+              <div class="min-w-0"><div class="link-url" id="studentUrl"></div>
+              <div class="flex gap-2 mt-2"><a class="chip" id="studentOpen" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิด</a></div></div></div>
+          </div>
+          <div class="glass panel-pad">
+            <h3 class="font-semibold text-lg">ข้อมูล</h3>
+            <div class="flex flex-col gap-3 mt-4">
+              <button class="btn btn-ghost" id="btnCsvAll"><i class="fa-solid fa-file-csv"></i> ส่งออกประวัติการเช็กอิน (CSV)</button>
+              <button class="btn btn-ghost" id="btnCsvSurvey"><i class="fa-solid fa-file-csv"></i> ส่งออกผลแบบประเมิน (CSV)</button>
+              <div class="flex items-center justify-between gap-3 local-only">
+                <span class="text-sm">จำลองผู้เข้าร่วมแบบเรียลไทม์</span>
+                <button class="switch" id="simSwitch" role="switch" aria-checked="false" aria-label="เปิดปิดการจำลอง"></button>
+              </div>
+              <button class="btn btn-ghost local-only" id="btnReset"><i class="fa-solid fa-rotate"></i> รีเซ็ตเป็นข้อมูลตัวอย่าง</button>
+              <button class="btn btn-ghost local-only" id="btnClear"><i class="fa-solid fa-trash"></i> ล้างข้อมูลทั้งหมด (เริ่มงานจริง)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="screen" id="screen" hidden>
+  <button class="btn btn-ghost btn-sm screen-exit" id="btnScreenExit"><i class="fa-solid fa-xmark"></i> ออกจากจอใหญ่ (Esc)</button>
+  <div id="screenBody"></div>
+</div>
+<datalist id="studentList"></datalist>
+<div id="printRoot"></div>
+
+<script src="shared.js?v=7"></script>
+<script>
+(() => {
+const {parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
+  drawQR, decodeImageFile, beep, toast, emblemSVG, download, mountPass, gaugeSVG, mountCertificate, prepareCertPrint, exportPng} = CAI;
+const MIN = CONFIG.MIN_STATIONS;
+let D = {students:{}, checkins:[]}, VM = {};
+let view = 'dashboard', focusSid = null, certSid = null, sim = store.get('ttr-admin-sim', false);
+const keys = {};
+const unchanged = (k, v) => { if (keys[k] === v) return true; keys[k] = v; return false; };
+const visitedOf = sid => VM[sid] || new Map();
+const modeBadge = () => DB.mode === 'remote'
+  ? '<span class="mode-badge mode-remote"><i class="fa-solid fa-cloud"></i> ออนไลน์ · Google Sheets</span>'
+  : '<span class="mode-badge mode-local"><i class="fa-solid fa-flask"></i> โหมดทดลอง · ข้อมูลในเครื่องนี้</span>';
+
+/* ================= Login ================= */
+$('#gateEmblem').innerHTML = emblemSVG(false, 64);
+$('#brandEmblem').innerHTML = emblemSVG(false, 40);
+$('#gateHint').innerHTML = DB.mode === 'local'
+  ? `โหมดทดลอง: PIN คือ <span class="mono">${esc(CONFIG.LOCAL_ADMIN_PIN)}</span> (เปลี่ยนได้ใน shared.js)`
+  : 'ใช้ ADMIN_KEY ที่ตั้งไว้ใน Google Apps Script';
+$('#gateForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('#gateMsg');
+  msg.textContent = 'กำลังตรวจสอบ…';
+  try { await DB.login($('#pin').value.trim()); enter(); }
+  catch(err) { msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; const c = $('.gate-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
+});
+$('#btnLogout').addEventListener('click', () => { DB.logout(); location.reload(); });
+async function enter(){
+  $('#gate').hidden = true; $('#app').hidden = false;
+  $('#modeBadge').innerHTML = modeBadge();
+  $$('.local-only').forEach(el => el.hidden = DB.mode !== 'local');
+  try { TOKENS = await DB.stationTokens() || {}; } catch(err) { toast({kind:'warn', title:'โหลดรหัสลิงก์ครูไม่ได้', body:esc(err.message)}); }
+  await refresh();
+  const h = location.hash.slice(1);
+  go(TABS.some(t => t.v === h) ? h : 'dashboard', false);
+  DB.subscribe(refresh);
+  DB._onLocal = refresh;
+}
+
+/* ================= Data ================= */
+let refreshing = false, pending = false;
+async function refresh(){
+  if (refreshing) { pending = true; return; }
+  refreshing = true;
+  try {
+    D = await DB.all(); VM = visitedMap(D);
+    if (!focusSid || !D.students[focusSid]) focusSid = Object.keys(D.students)[0] || null;
+    renderDatalist(); render();
+    $('#liveDot').classList.remove('off');
+  } catch(err) {
+    $('#liveDot').classList.add('off');
+    if (/รหัสผู้ดูแล/.test(err.message)) { DB.logout(); location.reload(); }
+    toast({kind:'err', title:'โหลดข้อมูลไม่สำเร็จ', body:esc(err.message)});
+  } finally { refreshing = false; if (pending) { pending = false; refresh(); } }
+}
+function renderDatalist(){
+  if (unchanged('dl', Object.keys(D.students).length)) return;
+  $('#studentList').innerHTML = Object.values(D.students).map(s => `<option value="${esc(s.sid)}">${esc(fullName(s))} · ${esc(s.cls)}</option>`).join('');
+  const classes = [...new Set(Object.values(D.students).map(s => s.cls))].sort((a,b) => a.localeCompare(b, 'th', {numeric:true}));
+  const cur = $('#fClass').value, cur2 = $('#sheetClass').value;
+  $('#fClass').innerHTML = '<option value="">ทุกห้อง</option>' + classes.map(c => `<option>${esc(c)}</option>`).join('');
+  $('#sheetClass').innerHTML = classes.map(c => `<option>${esc(c)}</option>`).join('');
+  if (cur) $('#fClass').value = cur; if (cur2) $('#sheetClass').value = cur2;
+}
+
+/* ================= Tabs ================= */
+const TABS = [
+  {v:'dashboard', label:'แดชบอร์ด', icon:'fa-chart-simple'},
+  {v:'students', label:'สถานะนักเรียน', icon:'fa-list-check'},
+  {v:'register', label:'ลงทะเบียน & บัตร', icon:'fa-id-card'},
+  {v:'cert', label:'เกียรติบัตร', icon:'fa-award'},
+  {v:'settings', label:'ตั้งค่า & ลิงก์ครู', icon:'fa-sliders'},
+];
+function go(v, scroll = true){
+  view = v;
+  $('#tabs').innerHTML = TABS.map(t => `<a href="#${t.v}" class="navtab" data-tab="${t.v}" ${t.v===view?'aria-current="page"':''}><i class="fa-solid ${t.icon}"></i><span>${t.label}</span></a>`).join('');
+  $$('[data-view]').forEach(s => s.hidden = s.dataset.view !== v);
+  try { history.replaceState(null, '', '#' + v); } catch(e) {}
+  render();
+  if (scroll) window.scrollTo({top:0, behavior:'smooth'});
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]'); if (t) { e.preventDefault(); go(t.dataset.tab); }
+  const c = e.target.closest('[data-open-cert]'); if (c) { certSid = c.dataset.openCert; go('cert'); }
+  const p = e.target.closest('[data-open-pass]'); if (p) { focusSid = p.dataset.openPass; go('register'); }
+});
+function render(){
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'students') renderStudents();
+  if (view === 'register') renderPass();
+  if (view === 'cert') renderCert();
+  if (view === 'settings') renderSettings();
+  if (!$('#screen').hidden) renderScreen();
+}
+
+/* ================= Dashboard ================= */
+let prevCounts = {};
+function renderDashboard(){
+  const counts = {}; STATIONS.forEach(s => counts[s.id] = 0); D.checkins.forEach(c => counts[c.st] = (counts[c.st] || 0) + 1);
+  const students = Object.values(D.students);
+  const eligible = Object.values(VM).filter(m => m.size >= MIN).length;
+  const started = Object.values(VM).length;
+  const max = Math.max(1, ...Object.values(counts));
+  $('#liveText').textContent = DB.mode === 'local' ? (sim ? 'จำลองผู้เข้าร่วมอยู่' : 'อัปเดตทันทีเมื่อครูสแกน') : `อัปเดตทุก ${CONFIG.POLL_MS / 1000} วินาที`;
+  $('#kpis').innerHTML = [
+    ['ผู้ลงทะเบียน', students.length, 'fa-users', 'var(--blue)', `เริ่มเข้าฐานแล้ว ${started} คน`],
+    ['เช็กอินรวม', D.checkins.length, 'fa-qrcode', 'var(--purple)', `เฉลี่ย ${(students.length ? D.checkins.length / students.length : 0).toFixed(1)} ฐาน/คน`],
+    ['ได้สิทธิ์เกียรติบัตร', eligible, 'fa-award', 'var(--green)', `${students.length ? Math.round(eligible / students.length * 100) : 0}% ของผู้ลงทะเบียน`],
+    ['ยังไม่เข้าฐานใด', students.length - started, 'fa-user-clock', 'var(--amber)', 'ควรประชาสัมพันธ์เพิ่ม'],
+  ].map(([l, n, ic, c, sub]) => `<div class="glass kpi"><div class="flex items-center justify-between"><span>${l}</span><i class="fa-solid ${ic}" style="color:${c};filter:drop-shadow(0 0 6px ${c})"></i></div>
+    <b style="color:${c};text-shadow:0 0 20px ${c}">${n.toLocaleString('th-TH')}</b><span class="faint">${sub}</span></div>`).join('');
+  $('#ovCards').innerHTML = STATIONS.map(s => `
+    <article class="ov-card tilt" data-tilt style="--h:${s.h}">
+      <div class="flex items-start justify-between gap-3 relative">
+        <div class="st-icon" style="width:48px;height:48px;font-size:20px"><i class="fa-solid ${s.icon}"></i></div>
+        <div class="text-right"><span class="ov-count ${prevCounts[s.id] !== undefined && prevCounts[s.id] !== counts[s.id] ? 'bump' : ''}">${counts[s.id]}</span><div class="text-xs faint">คนเข้าแล้ว</div></div>
+      </div>
+      <div class="st-no mt-4 relative">STATION ${String(s.id).padStart(2,'0')}</div>
+      <h4 class="text-lg font-semibold leading-tight relative">${esc(s.name)}</h4>
+      <p class="text-sm muted relative">${esc(s.desc)}</p>
+      <div class="ov-bar mt-4"><i style="width:${counts[s.id] / max * 100}%"></i></div>
+      <div class="mt-3 text-xs muted flex flex-col gap-1 relative">
+        <span><i class="fa-solid fa-chalkboard-user" style="color:var(--h)"></i>&nbsp; วิทยากร ${esc(s.speaker)}</span>
+        <span><i class="fa-solid fa-location-dot" style="color:var(--h)"></i>&nbsp; ${esc(s.room)}</span>
+      </div>
+    </article>`).join('');
+  prevCounts = counts;
+  renderSurvey();
+
+  const byClass = {};
+  D.checkins.forEach(c => { const s = D.students[c.sid]; if (s) byClass[s.cls] = (byClass[s.cls] || 0) + 1; });
+  const cls = Object.entries(byClass).sort((a,b) => b[1] - a[1]).slice(0, 6), cmax = Math.max(1, ...cls.map(x => x[1]));
+  const hues = ['#ffc24b','#2de2ff','#9b5cff','#39ff9f','#ff4dd8','#4d8bff'];
+  $('#lbClass').innerHTML = cls.length ? cls.map(([k, n], i) => `<div class="lb-row"><span class="rank ${i<3?'r'+(i+1):''}">${i+1}</span>
+    <div class="min-w-0"><div class="text-sm">${esc(k)}</div><div class="ov-bar mt-1.5" style="--h:${hues[i]}"><i style="width:${n/cmax*100}%"></i></div></div>
+    <span class="mono text-sm">${n}</span></div>`).join('') : '<div class="empty">ยังไม่มีข้อมูล</div>';
+  const top = Object.entries(VM).map(([sid, m]) => [sid, m.size, Math.max(...m.values())]).sort((a,b) => b[1] - a[1] || a[2] - b[2]).slice(0, 6);
+  $('#lbStudents').innerHTML = top.length ? top.map(([sid, n], i) => { const s = D.students[sid]; if (!s) return '';
+    return `<button class="lb-row text-left" data-student="${esc(sid)}"><span class="rank ${i<3?'r'+(i+1):''}">${i+1}</span>
+    <div class="min-w-0"><div class="truncate text-sm">${esc(fullName(s))}</div><div class="text-xs faint">${esc(s.cls)}</div></div>
+    <span class="pill ${n>=MIN?'pill-green':'pill-blue'}">${n}/${STATIONS.length}</span></button>`; }).join('') : '<div class="empty">ยังไม่มีข้อมูล</div>';
+  $('#feed').innerHTML = D.checkins.length ? D.checkins.slice(-8).reverse().map(c => { const s = D.students[c.sid], st = ST[c.st]; if (!s || !st) return '';
+    return `<div class="feed-row"><span class="tl-dot" style="--h:${st.h}"></span><span class="mono text-xs faint">${tFmt(c.ts)}</span>
+    <span class="min-w-0 truncate"><b class="font-medium">${esc(s.first)}</b> <span class="muted">เข้า</span> ${esc(st.name)}${c.by ? ` <span class="faint text-xs">· ${esc(c.by)}</span>` : ''}</span></div>`; }).join('') : '<div class="empty">รอการสแกนครั้งแรก</div>';
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-student]'); if (b) { focusSid = b.dataset.student; go('students'); } });
+
+/* ================= Survey results ================= */
+function renderSurvey(){
+  const list = Object.values(D.surveys || {});
+  const el = $('#surveyPanel');
+  const head = '<h3 class="font-semibold text-lg"><i class="fa-solid fa-square-poll-vertical neon-blue"></i>&nbsp; ผลแบบประเมิน</h3>';
+  if (!list.length) { el.innerHTML = head + '<div class="empty mt-4">ยังไม่มีผู้ตอบ นักเรียนจะตอบแบบประเมินก่อนดาวน์โหลดเกียรติบัตรที่หน้านักเรียน</div>'; return; }
+  const avg = k => list.reduce((a, x) => a + (+x[k] || 0), 0) / list.length;
+  const fav = {}; list.forEach(x => { if (x.fav) fav[x.fav] = (fav[x.fav] || 0) + 1; });
+  const favTop = Object.entries(fav).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const comments = list.filter(x => x.comment).sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).slice(0, 4);
+  const bars = SURVEY.map(q => {
+    const a = avg(q.id), hue = a >= 4 ? '#39ff9f' : a >= 3 ? '#ffc24b' : '#ff4d7a';
+    return `<div><div class="flex justify-between text-sm gap-3"><span class="min-w-0">${esc(q.text)}</span><span class="mono">${a.toFixed(2)}/5</span></div>
+      <div class="ov-bar mt-1.5" style="--h:${hue}"><i style="width:${a / 5 * 100}%"></i></div></div>`;
+  }).join('');
+  const favHtml = favTop.length ? favTop.map(([id, n], i) => `<div class="lb-row mb-2"><span class="rank r${i + 1}">${i + 1}</span><span class="truncate">${esc(ST[id] ? ST[id].name : id)}</span><span class="mono text-sm">${n}</span></div>`).join('') : '<div class="faint text-sm">-</div>';
+  const comHtml = comments.length ? comments.map(x => `<p class="text-sm mb-2">"${esc(x.comment)}"</p>`).join('') : '<div class="faint text-sm">ยังไม่มีความคิดเห็น</div>';
+  el.innerHTML = `<div class="flex flex-wrap items-center justify-between gap-3">${head}<span class="pill pill-blue">ตอบแล้ว ${list.length} คน</span></div>
+    <div class="grid lg:grid-cols-3 gap-6 mt-5">
+      <div class="flex flex-col gap-3 min-w-0">${bars}</div>
+      <div class="min-w-0"><div class="text-sm muted mb-3">ฐานที่ชอบที่สุด</div>${favHtml}</div>
+      <div class="min-w-0"><div class="text-sm muted mb-3">ความคิดเห็นล่าสุด</div>${comHtml}</div>
+    </div>`;
+}
+
+/* ================= Big screen (โปรเจกเตอร์) ================= */
+const clockText = () => new Date().toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'});
+function renderScreen(){
+  const counts = {}; STATIONS.forEach(s => counts[s.id] = 0); D.checkins.forEach(c => counts[c.st] = (counts[c.st] || 0) + 1);
+  const max = Math.max(1, ...Object.values(counts));
+  const students = Object.keys(D.students).length, eligible = Object.values(VM).filter(m => m.size >= MIN).length;
+  const byClass = {}; D.checkins.forEach(c => { const s = D.students[c.sid]; if (s) byClass[s.cls] = (byClass[s.cls] || 0) + 1; });
+  const cls = Object.entries(byClass).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const feed = D.checkins.slice(-6).reverse();
+  const kpis = [['ผู้ลงทะเบียน', students, 'var(--blue)'], ['เช็กอินรวม', D.checkins.length, 'var(--purple)'], ['ได้เกียรติบัตร', eligible, 'var(--green)']]
+    .map(([l, n, c]) => `<div class="glass scr-kpi"><b style="color:${c};text-shadow:0 0 30px ${c}">${n.toLocaleString('th-TH')}</b><span>${l}</span></div>`).join('');
+  const rows = STATIONS.map(s => `<div class="scr-row" style="--h:${s.h}"><div class="st-icon"><i class="fa-solid ${s.icon}"></i></div>
+    <span class="scr-name">${s.id}. ${esc(s.name)}</span><div class="ov-bar scr-bar"><i style="width:${counts[s.id] / max * 100}%"></i></div><b class="mono">${counts[s.id]}</b></div>`).join('');
+  const clsHtml = cls.map(([k, n], i) => `<div class="lb-row scr-lb"><span class="rank ${i < 3 ? 'r' + (i + 1) : ''}">${i + 1}</span><span>${esc(k)}</span><b class="mono">${n}</b></div>`).join('') || '<div class="faint">รอข้อมูล</div>';
+  const feedHtml = feed.map(c => { const s = D.students[c.sid], st = ST[c.st]; return s && st ? `<div class="feed-row scr-feed"><span class="tl-dot" style="--h:${st.h}"></span><b>${esc(s.first)}</b> <span class="muted">เข้า</span> ${esc(st.name)}</div>` : ''; }).join('') || '<div class="faint">รอการสแกนครั้งแรก</div>';
+  $('#screenBody').innerHTML = `
+    <div class="flex flex-wrap items-center justify-between gap-6">
+      <div class="flex items-center gap-5">${emblemSVG(false, 84)}<div><div class="scr-title"><span class="grad-text">Computer &amp; AI Innovation</span></div>
+        <div class="scr-sub">โรงเรียนตันตรารักษ์ · สแกนบัตรที่ทุกฐาน ครบ ${MIN} ฐานรับเกียรติบัตร</div></div></div>
+      <div class="scr-clock mono" id="scrClock">${clockText()}</div>
+    </div>
+    <div class="grid grid-cols-3 gap-5 mt-8">${kpis}</div>
+    <div class="scr-grid mt-6">
+      <div class="glass panel-pad">${rows}</div>
+      <div class="flex flex-col gap-6">
+        <div class="glass panel-pad"><div class="scr-h"><i class="fa-solid fa-trophy" style="color:var(--gold)"></i> ห้องที่เข้าฐานมากที่สุด</div>${clsHtml}</div>
+        <div class="glass panel-pad"><div class="scr-h"><i class="fa-solid fa-tower-broadcast neon-green"></i> ล่าสุด</div>${feedHtml}</div>
+      </div>
+    </div>`;
+}
+async function openScreen(){
+  $('#screen').hidden = false; document.body.style.overflow = 'hidden'; renderScreen();
+  try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(e) {}
+}
+function closeScreen(){
+  $('#screen').hidden = true; document.body.style.overflow = '';
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+}
+$('#btnScreen').addEventListener('click', openScreen);
+$('#btnScreenExit').addEventListener('click', closeScreen);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#screen').hidden) closeScreen(); });
+setInterval(() => { const c = $('#scrClock'); if (c) c.textContent = clockText(); }, 10000);
+
+/* ================= Students ================= */
+['#fQuery', '#fClass', '#fStatus'].forEach(id => $(id).addEventListener('input', () => { keys.rows = null; renderStudents(); }));
+function filtered(){
+  const q = $('#fQuery').value.trim().toLowerCase(), c = $('#fClass').value, st = $('#fStatus').value;
+  return Object.values(D.students).filter(s => {
+    const n = visitedOf(s.sid).size;
+    if (q && !(s.sid.includes(q) || fullName(s).toLowerCase().includes(q))) return false;
+    if (c && s.cls !== c) return false;
+    if (st === 'done' && n < MIN) return false;
+    if (st === 'doing' && (n === 0 || n >= MIN)) return false;
+    if (st === 'none' && n !== 0) return false;
+    return true;
+  }).sort((a,b) => a.cls.localeCompare(b.cls, 'th', {numeric:true}) || a.sid.localeCompare(b.sid));
+}
+function statusPill(n){
+  return n >= MIN ? '<span class="pill pill-green"><i class="fa-solid fa-award"></i> ครบแล้ว</span>'
+    : n > 0 ? `<span class="pill pill-blue">ขาด ${MIN - n}</span>` : '<span class="pill pill-dim">ยังไม่เริ่ม</span>';
+}
+function renderStudents(){
+  const list = filtered();
+  $('#rowCount').textContent = `แสดง ${list.length} จาก ${Object.keys(D.students).length} คน`;
+  if (!unchanged('rows', list.map(s => s.sid + visitedOf(s.sid).size).join() + focusSid)) {
+    $('#rows').innerHTML = list.length ? list.map(s => { const v = visitedOf(s.sid);
+      return `<tr data-sid="${esc(s.sid)}" aria-selected="${s.sid === focusSid}">
+        <td class="mono">${esc(s.sid)}</td><td>${esc(fullName(s))}${s.demo ? ' <span class="faint text-xs">(ตัวอย่าง)</span>' : ''}</td><td>${esc(s.cls)}</td>
+        <td><div class="dots sm">${STATIONS.map(st => `<span class="dot ${v.has(st.id)?'on':''}" style="--h:${st.h}" title="${esc(st.name)}"></span>`).join('')}</div></td>
+        <td class="mono text-right">${v.size}/${STATIONS.length}</td><td>${statusPill(v.size)}</td></tr>`; }).join('')
+      : '<tr><td colspan="6"><div class="empty my-4">ไม่พบนักเรียนตามเงื่อนไขที่เลือก</div></td></tr>';
+  }
+  renderDetail();
+}
+$('#rows').addEventListener('click', e => { const tr = e.target.closest('tr[data-sid]'); if (!tr) return; focusSid = tr.dataset.sid; renderStudents(); if (innerWidth < 1280) $('#detail').scrollIntoView({behavior:'smooth'}); });
+$('#fQr').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const sid = parseCode(await decodeImageFile(f)); if (!sid || !D.students[sid]) throw new Error('QR นี้ไม่ตรงกับนักเรียนในระบบ');
+    focusSid = sid; $('#fQuery').value = sid; keys.rows = null; renderStudents(); }
+  catch(err) { toast({kind:'err', title:'อ่าน QR ไม่สำเร็จ', body:esc(err.message)}); }
+});
+function renderDetail(){
+  const s = D.students[focusSid], el = $('#detail');
+  if (!s) { el.innerHTML = '<div class="glass panel-pad"><div class="empty">เลือกนักเรียนจากตารางเพื่อดูรายละเอียด</div></div>'; return; }
+  const v = visitedOf(s.sid), n = v.size, ok = n >= MIN;
+  if (unchanged('detail', s.sid + ':' + n)) return;
+  const tl = [...v.entries()].sort((a,b) => a[1] - b[1]);
+  const byMap = {}; D.checkins.forEach(c => { if (c.sid === s.sid) byMap[c.st] = c.by; });
+  el.innerHTML = `<div class="glass panel-pad xl:sticky xl:top-40">
+    <div class="flex items-center gap-3">
+      <div class="avatar" style="width:48px;height:48px;font-size:18px">${esc(initials(s))}</div>
+      <div class="min-w-0"><div class="font-semibold text-lg truncate" style="font-family:var(--f-display)">${esc(fullName(s))}</div><div class="text-xs faint mono">${esc(s.sid)} · ${esc(s.cls)}</div></div>
+    </div>
+    <div class="gauge mt-5" style="width:min(100%,200px)"><div class="gauge-disc"></div>${gaugeSVG(v)}
+      <div class="center"><div><div class="big" style="font-size:44px">${n}<small>/${STATIONS.length}</small></div><div class="text-xs muted">ฐานที่ผ่าน</div></div></div></div>
+    <div class="bar3d ${ok?'done':''} mt-5"><i style="width:${Math.min(100, n / MIN * 100)}%"></i></div>
+    <p class="mt-2 text-center text-sm ${ok?'neon-green':''}" style="font-family:var(--f-display);font-weight:600">${ok ? '<i class="fa-solid fa-unlock"></i> ครบเงื่อนไขเกียรติบัตร' : `เข้าแล้ว ${n}/${STATIONS.length} ฐาน · ขาดอีก ${MIN - n} ฐาน`}</p>
+    <div class="hr my-5"></div>
+    <div class="flex flex-col gap-2">${STATIONS.map(st => { const on = v.has(st.id);
+      return `<div class="flex items-center gap-3 text-sm ${on ? '' : 'faint'}" style="--h:${st.h}">
+        <span class="ci ${on?'y':'n'}" style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;flex:none"><i class="fa-solid ${on?'fa-check':'fa-minus'}"></i></span>
+        <span class="flex-1 min-w-0 truncate">ฐานที่ ${st.id} · ${esc(st.name)}</span>
+        ${on ? `<span class="mono text-xs muted" title="${esc(byMap[st.id] || '')}">${tFmt(v.get(st.id))}</span>
+        <button class="chip" data-uncheck="${st.id}" title="ยกเลิกการเช็กอินนี้" aria-label="ยกเลิกการเช็กอินฐานที่ ${st.id}"><i class="fa-solid fa-xmark"></i></button>` : ''}
+      </div>`; }).join('')}</div>
+    <div class="flex flex-wrap gap-2 mt-5">
+      <button class="btn btn-ghost btn-sm" data-open-pass="${esc(s.sid)}"><i class="fa-solid fa-id-card"></i> บัตร QR</button>
+      <button class="btn ${ok?'btn-gold':'btn-ghost'} btn-sm" data-open-cert="${esc(s.sid)}" ${ok?'':'disabled'}><i class="fa-solid fa-award"></i> เกียรติบัตร</button>
+    </div>
+  </div>`;
+}
+/* ยกเลิกเช็กอินที่บันทึกผิด: กด 2 ครั้งเพื่อยืนยัน */
+$('#detail').addEventListener('click', async e => {
+  const b = e.target.closest('[data-uncheck]'); if (!b) return;
+  if (!b.dataset.armed) { b.dataset.armed = 1; b.innerHTML = 'ยืนยันลบ?'; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.innerHTML = '<i class="fa-solid fa-xmark"></i>'; } }, 3000); return; }
+  try { await DB.removeCheckin(focusSid, +b.dataset.uncheck); keys.detail = null; await refresh(); toast({title:'ยกเลิกการเช็กอินแล้ว', icon:'fa-rotate-left'}); }
+  catch(err) { toast({kind:'err', title:'ลบไม่สำเร็จ', body:esc(err.message)}); }
+});
+
+/* ================= Register & pass ================= */
+$('#regForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('#regMsg');
+  const sid = $('#rSid').value.trim(), first = $('#rFirst').value.trim(), last = $('#rLast').value.trim(), room = $('#rRoom').value.trim() || '1';
+  if (!/^[A-Za-z0-9]{4,10}$/.test(sid)) { msg.innerHTML = '<span style="color:var(--red)">กรอกเลขประจำตัว 4–10 หลัก (ตัวเลขหรือตัวอักษรอังกฤษ)</span>'; $('#rSid').focus(); return; }
+  if (!first || !last) { msg.innerHTML = '<span style="color:var(--red)">กรอกชื่อและนามสกุลให้ครบ</span>'; return; }
+  try {
+    const r = await DB.register({sid, prefix:$('#rPrefix').value, first, last, cls:`${$('#rLevel').value}/${room}`});
+    focusSid = sid; await refresh();
+    if (r.status === 'exists') { msg.innerHTML = `<span style="color:var(--amber)">รหัส ${esc(sid)} ลงทะเบียนไว้แล้ว แสดงบัตรเดิมให้</span>`; return; }
+    msg.innerHTML = '<span class="neon-green"><i class="fa-solid fa-circle-check"></i> สร้างบัตรเรียบร้อย</span>';
+    toast({title:'ลงทะเบียนสำเร็จ', body:esc(fullName(r.student)), icon:'fa-id-card'}); beep('ok');
+    e.target.reset(); $('#rRoom').value = '1';
+  } catch(err) { msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
+});
+/* นำเข้าไฟล์รายงานรายชื่อนักเรียน (.xlsx) ด้วย SheetJS */
+$('#xlsxFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const msg = $('#xlsxMsg'); msg.textContent = 'กำลังอ่านไฟล์…';
+  try {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:''});
+    const {students, skip} = parseStudentReport(rows);
+    if (!students.length) throw new Error('ไม่พบนักเรียนที่นำเข้าได้ในไฟล์นี้');
+    msg.textContent = `กำลังนำเข้า ${students.length} คน…`;
+    const r = await DB.importMany(students); keys.dl = null; await refresh();
+    msg.innerHTML = `<span class="neon-green">เพิ่ม ${r.added} คน</span>${r.skipped ? ` · มีอยู่แล้ว ${r.skipped} คน` : ''}`
+      + ` <span class="faint">· ข้ามอนุบาล ${skip.kinder} · ลาออก/จำหน่าย ${skip.inactive}${skip.invalid ? ' · ข้อมูลไม่ครบ ' + skip.invalid : ''}${r.removedDemo ? ' · ลบนักเรียนตัวอย่าง ' + r.removedDemo : ''}</span>`;
+    toast({title:`นำเข้านักเรียน ${r.added} คน`, icon:'fa-file-excel'});
+  } catch(err) { msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
+});
+$('#btnImport').addEventListener('click', async () => {
+  const lines = $('#bulk').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const list = [], bad = [];
+  lines.forEach((l, i) => {
+    const p = l.split(/\t|,/).map(x => x.trim());
+    if (p.length >= 5 && /^[A-Za-z0-9]{4,10}$/.test(p[0])) list.push({sid:p[0], prefix:p[1], first:p[2], last:p[3], cls:p[4]});
+    else if (!(i === 0 && !/^\d/.test(p[0]))) bad.push(i + 1); // ข้ามแถวหัวตาราง
+  });
+  if (!list.length) { $('#bulkMsg').innerHTML = '<span style="color:var(--red)">ไม่พบข้อมูลที่ถูกรูปแบบ</span>'; return; }
+  try {
+    const r = await DB.importMany(list); await refresh();
+    $('#bulkMsg').innerHTML = `<span class="neon-green">เพิ่ม ${r.added} คน</span>${r.skipped ? ` · ข้าม ${r.skipped} คน (มีอยู่แล้ว)` : ''}${bad.length ? ` · <span style="color:var(--amber)">แถวที่อ่านไม่ได้: ${bad.join(', ')}</span>` : ''}`;
+    if (r.added) $('#bulk').value = '';
+  } catch(err) { $('#bulkMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
+});
+$('#passQuery').addEventListener('change', e => { const v = e.target.value.trim(); if (D.students[v]) { focusSid = v; renderPass(); } else if (v) toast({kind:'err', title:'ไม่พบรหัสนี้'}); });
+function renderPass(){
+  const s = D.students[focusSid];
+  if (unchanged('pass', s ? s.sid + ':' + visitedOf(s.sid).size : 'none')) return;
+  if (!s) { $('#passHolder').innerHTML = '<div class="empty">ยังไม่มีผู้ลงทะเบียน</div>'; return; }
+  $('#passQuery').value = s.sid;
+  mountPass($('#passHolder'), s, visitedOf(s.sid));
+}
+$('#btnPassPng').addEventListener('click', () => { const s = D.students[focusSid]; if (s) exportPng($('#passCard'), `station-pass-${s.sid}.png`); });
+$('#btnSheet').addEventListener('click', () => {
+  const cls = $('#sheetClass').value;
+  const list = Object.values(D.students).filter(s => s.cls === cls).sort((a,b) => a.sid.localeCompare(b.sid));
+  if (!list.length) { toast({kind:'warn', title:'ห้องนี้ยังไม่มีนักเรียน'}); return; }
+  const root = $('#printRoot');
+  root.innerHTML = `<div class="sheet">${list.map(s => `<div class="sheet-card"><div class="q" data-q="${esc(qrPayload(s))}"></div>
+    <div><div class="n">${esc(fullName(s))}</div><div class="m">${esc(s.cls)} · รหัส ${esc(s.sid)}</div><div class="e">COMPUTER &amp; AI INNOVATION · ตันตรารักษ์</div></div></div>`).join('')}</div>`;
+  $$('[data-q]', root).forEach(el => drawQR(el, el.dataset.q, 100, '#000'));
+  root.dataset.kind = 'sheet';
+  setTimeout(() => window.print(), 400);
+});
+
+/* ================= Certificate ================= */
+$('#minTxt').textContent = MIN;
+$('#certForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const q = $('#certQuery').value.trim();
+  const s = D.students[q] || Object.values(D.students).find(x => fullName(x).includes(q));
+  if (!s) { toast({kind:'err', title:'ไม่พบนักเรียน', body:'ตรวจสอบรหัสประจำตัวอีกครั้ง'}); return; }
+  certSid = s.sid; renderCert();
+});
+function renderCert(){
+  const s = D.students[certSid || focusSid];
+  const checks = $('#certChecks'), out = $('#certOut');
+  if (unchanged('cert', s ? s.sid + ':' + visitedOf(s.sid).size : 'none')) return;
+  if (!s) { checks.innerHTML = '<div class="empty">กรอกรหัสนักเรียนเพื่อตรวจสอบสิทธิ์</div>'; out.innerHTML = ''; return; }
+  $('#certQuery').value = s.sid;
+  const v = visitedOf(s.sid), n = v.size, ok = n >= MIN;
+  checks.innerHTML = `<h3 class="font-semibold">ตรวจสอบเงื่อนไขอัตโนมัติ</h3>
+    <div class="text-xs faint mono mt-1">${esc(s.sid)} · ${esc(fullName(s))}</div>
+    <div class="flex flex-col gap-3 mt-4">
+      <div class="check-row"><span class="ci y"><i class="fa-solid fa-check"></i></span><span>ลงทะเบียนและมี QR Code ประจำตัว</span></div>
+      <div class="check-row"><span class="ci ${n>0?'y':'n'}"><i class="fa-solid ${n>0?'fa-check':'fa-minus'}"></i></span><span>สแกนเข้าฐานอย่างน้อย 1 ฐาน</span></div>
+      <div class="check-row"><span class="ci ${ok?'y':'n'}"><i class="fa-solid ${ok?'fa-check':'fa-minus'}"></i></span><span>เข้าฐานครบ ${MIN} ฐานขึ้นไป <span class="mono ${ok?'neon-green':'faint'}">(${n}/${MIN})</span></span></div>
+    </div>
+    <div class="bar3d ${ok?'done':''} mt-5"><i style="width:${Math.min(100, n / MIN * 100)}%"></i></div>`;
+  if (!ok) {
+    out.innerHTML = `<div class="glass lock-hero h-full"><div class="lock-3d"><i class="fa-solid fa-lock"></i></div>
+      <h3 class="text-2xl font-bold">เกียรติบัตรยังล็อกอยู่</h3>
+      <p class="muted max-w-[30em]">${esc(fullName(s))} เข้าแล้ว ${n} ฐาน ต้องเข้าอีก <b class="neon-blue">${MIN - n} ฐาน</b> ระบบจะปลดล็อกให้ทันทีเมื่อสแกนครบ</p>
+      <div class="flex flex-wrap gap-2 justify-center">${STATIONS.filter(st => !v.has(st.id)).map(st => `<span class="chip" style="cursor:default"><i class="fa-solid ${st.icon}" style="color:${st.h}"></i> ${esc(st.name)}</span>`).join('')}</div></div>`;
+    return;
+  }
+  mountCertificate(out, s, v);
+}
+window.addEventListener('beforeprint', () => { if (view === 'cert' && $('#printRoot').dataset.kind !== 'sheet') prepareCertPrint(); });
+window.addEventListener('afterprint', () => { $('#printRoot').dataset.kind = ''; });
+
+/* ================= Settings ================= */
+let TOKENS = {};
+function teacherUrl(id){ return new URL(`teacher.html#st${id}${TOKENS[id] ? '-' + TOKENS[id] : ''}`, location.href).href; }
+function renderSettings(){
+  if (!unchanged('links', 1)) {
+    $('#links').innerHTML = STATIONS.map(s => `<div class="link-card" style="--h:${s.h}">
+      <div class="qrbox" data-link-qr="${s.id}"></div>
+      <div class="min-w-0"><div class="flex items-center gap-2"><div class="st-icon" style="width:28px;height:28px;font-size:12px;border-radius:8px"><i class="fa-solid ${s.icon}"></i></div>
+        <b style="font-family:var(--f-display)">ฐานที่ ${s.id} · ${esc(s.name)}</b></div>
+        <div class="link-url mt-2" id="url${s.id}">${esc(teacherUrl(s.id))}</div>
+        <div class="flex gap-2 mt-2"><button class="chip" data-copy="${s.id}"><i class="fa-solid fa-copy"></i> คัดลอก</button>
+        <a class="chip" href="${esc(teacherUrl(s.id))}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิด</a></div></div></div>`).join('');
+    $$('[data-link-qr]').forEach(el => drawQR(el, teacherUrl(el.dataset.linkQr), 84));
+    const su = new URL('student.html', location.href).href;
+    $('#studentUrl').textContent = su; $('#studentOpen').href = su; drawQR($('#studentQr'), su, 84);
+  }
+  $('#modePanel').innerHTML = DB.mode === 'local' ? `
+    <h3 class="font-semibold text-lg">${modeBadge()}</h3>
+    <p class="text-sm muted mt-3">ตอนนี้ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้ เปิดหน้าครูกับหน้า Admin ในเบราว์เซอร์เดียวกันจะเห็นข้อมูลกันทันที เหมาะสำหรับทดลองระบบ</p>
+    <p class="text-sm mt-3">ถ้าจะใช้งานจริงกับครูหลายเครื่อง ให้ติดตั้ง Google Apps Script ตามไฟล์ <span class="mono">README.md</span> แล้ววาง URL ลงใน <span class="mono">API_URL</span> ในไฟล์ <span class="mono">shared.js</span></p>`
+    : `<h3 class="font-semibold text-lg">${modeBadge()}</h3><p class="text-sm muted mt-3">ทุกเครื่องบันทึกลง Google Sheets ชุดเดียวกัน แดชบอร์ดดึงข้อมูลใหม่ทุก ${CONFIG.POLL_MS / 1000} วินาที</p>
+      <div class="link-url mt-3">${esc(CONFIG.API_URL)}</div>`;
+  $('#simSwitch').setAttribute('aria-checked', sim);
+}
+$('#links').addEventListener('click', async e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  const url = teacherUrl(b.dataset.copy);
+  try { await navigator.clipboard.writeText(url); toast({title:'คัดลอกลิงก์แล้ว', body:`ฐานที่ ${b.dataset.copy}`, icon:'fa-copy'}); }
+  catch(err) { const r = document.createRange(); r.selectNodeContents($('#url' + b.dataset.copy)); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast({kind:'warn', title:'เลือกข้อความให้แล้ว', body:'กด Ctrl+C เพื่อคัดลอก'}); }
+});
+$('#simSwitch').addEventListener('click', () => { sim = !sim; store.set('ttr-admin-sim', sim); renderSettings(); });
+setInterval(() => { if (sim && DB.mode === 'local' && !document.hidden && !$('#app').hidden) DB.simTick(); }, 2600);
+function armed(btn, label, fn){
+  btn.addEventListener('click', () => {
+    if (!btn.dataset.armed) { btn.dataset.armed = 1; const old = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> กดอีกครั้งเพื่อยืนยัน'; setTimeout(() => { delete btn.dataset.armed; btn.innerHTML = old; }, 3000); return; }
+    delete btn.dataset.armed; btn.innerHTML = label; fn();
+  });
+}
+armed($('#btnReset'), '<i class="fa-solid fa-rotate"></i> รีเซ็ตเป็นข้อมูลตัวอย่าง', () => { for (const k in keys) delete keys[k]; DB.resetDemo(); toast({title:'รีเซ็ตข้อมูลตัวอย่างแล้ว', icon:'fa-rotate'}); });
+armed($('#btnClear'), '<i class="fa-solid fa-trash"></i> ล้างข้อมูลทั้งหมด (เริ่มงานจริง)', () => { for (const k in keys) delete keys[k]; sim = false; store.set('ttr-admin-sim', false); DB.clearAll(); toast({title:'ล้างข้อมูลแล้ว พร้อมเริ่มงานจริง', icon:'fa-trash'}); });
+
+/* CSV (เปิดด้วย Excel ได้ ภาษาไทยไม่เพี้ยนเพราะมี BOM) */
+function csv(rows){ return '﻿' + rows.map(r => r.map(x => `"${String(x ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n'); }
+function saveCsv(name, rows){ download(URL.createObjectURL(new Blob([csv(rows)], {type:'text/csv;charset=utf-8'})), name); }
+$('#btnCsv').addEventListener('click', () => saveCsv('students-status.csv', [
+  ['รหัส','คำนำหน้า','ชื่อ','นามสกุล','ชั้น', ...STATIONS.map(s => `ฐาน${s.id} ${s.name}`), 'รวม', 'สถานะ'],
+  ...filtered().map(s => { const v = visitedOf(s.sid); return [s.sid, s.prefix, s.first, s.last, s.cls, ...STATIONS.map(st => v.has(st.id) ? tFmt(v.get(st.id)) : ''), v.size, v.size >= MIN ? 'ได้เกียรติบัตร' : 'ยังไม่ครบ']; })]));
+$('#btnCsvSurvey').addEventListener('click', () => saveCsv('surveys.csv', [
+  ['รหัส','ชื่อ-นามสกุล','ชั้น','เวลา', ...SURVEY.map(q => q.text), 'ฐานที่ชอบที่สุด', 'ความคิดเห็น'],
+  ...Object.values(D.surveys || {}).map(x => { const s = D.students[x.sid] || {}; return [x.sid, fullName(s), s.cls, new Date(x.ts).toLocaleString('th-TH'), ...SURVEY.map(q => x[q.id]), ST[x.fav] ? ST[x.fav].name : '', x.comment]; })]));
+$('#btnPoster').addEventListener('click', () => {
+  const root = $('#printRoot');
+  root.innerHTML = `<div class="sheet posters">${STATIONS.map(s => `<div class="poster"><div class="p-no">ฐานที่ ${s.id}</div><div class="p-name">${esc(s.name)}</div><div class="p-th">${esc(s.th)} · ${esc(s.room)}</div>
+    <div class="q" data-q="${esc(teacherUrl(s.id))}"></div><div class="p-note">สำหรับครูประจำฐาน: สแกนเพื่อเปิดหน้าบันทึกเช็กอิน<br>ห้ามแจกนักเรียน</div></div>`).join('')}</div>`;
+  $$('[data-q]', root).forEach(el => drawQR(el, el.dataset.q, 160, '#000'));
+  root.dataset.kind = 'sheet';
+  setTimeout(() => window.print(), 400);
+});
+$('#btnCsvAll').addEventListener('click', () => saveCsv('checkins.csv', [
+  ['เวลา','รหัส','ชื่อ-นามสกุล','ชั้น','ฐาน','ชื่อฐาน','ผู้สแกน'],
+  ...D.checkins.map(c => { const s = D.students[c.sid] || {}; return [new Date(c.ts).toLocaleString('th-TH'), c.sid, fullName(s), s.cls, c.st, ST[c.st]?.name, c.by]; })]));
+
+/* ================= Boot ================= */
+if (DB.hasKey()) enter();
+})();
+</script>
+</body>
+</html>

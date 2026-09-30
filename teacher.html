@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>สแกนเข้าฐาน · Computer & AI Innovation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<link rel="stylesheet" href="shared.css?v=7">
+<style>
+  body{margin:0}
+  .scanner{max-width:520px;transform:none}
+  .station-select{font-family:var(--f-display);font-weight:600;font-size:17px;padding:.8em 2.4em .8em 1em}
+  .net-bar{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:16px}
+  .net-bar.is-off{border-color:rgba(255,194,75,.5);background:linear-gradient(90deg, rgba(255,194,75,.14), rgba(12,15,38,.7));color:var(--amber)}
+  .net-bar.is-queue{border-color:rgba(45,226,255,.45);color:var(--blue)}
+  .net-bar b{color:var(--ink)}
+  .result.pending{border-color:var(--blue);box-shadow:0 0 0 6px rgba(45,226,255,.07), 0 0 60px -10px rgba(45,226,255,.55)}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="bg-stars"></div><div class="bg-floor"></div></div>
+<div class="flash" id="flash" aria-hidden="true"></div>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<div class="mx-auto w-full max-w-[980px] px-4 md:px-6">
+  <header class="topbar">
+    <div class="topbar-inner glass">
+      <div class="brand">
+        <span id="brandEmblem"></span>
+        <div class="min-w-0">
+          <div class="brand-name">สแกนเข้าฐานกิจกรรม</div>
+          <div class="brand-sub">Computer &amp; AI Innovation · โรงเรียนตันตรารักษ์</div>
+        </div>
+      </div>
+      <span class="ml-auto" id="modeBadge"></span>
+    </div>
+  </header>
+
+  <main class="pt-5 pb-12 flex flex-col gap-5">
+    <div class="glass net-bar" id="netBar" role="status" hidden>
+      <i class="fa-solid fa-wifi"></i>
+      <span class="flex-1 min-w-0 text-sm" id="netText"></span>
+      <button class="btn btn-ghost btn-sm" id="btnFlush" hidden><i class="fa-solid fa-cloud-arrow-up"></i> ส่งตอนนี้</button>
+    </div>
+    <!-- เลือกฐาน -->
+    <section class="glass panel-pad">
+      <div class="grid sm:grid-cols-[1fr_1fr] gap-4 items-end">
+        <div class="field">
+          <label for="stationSel">ฐานที่คุณประจำอยู่</label>
+          <select class="input station-select" id="stationSel"></select>
+        </div>
+        <div class="field">
+          <label for="teacherName">ชื่อผู้สแกน (ไม่บังคับ)</label>
+          <input class="input" id="teacherName" placeholder="เช่น ครูธนากร" maxlength="40">
+        </div>
+      </div>
+      <div class="flex items-center gap-3 mt-4" id="stationCard"></div>
+    </section>
+
+    <div class="grid lg:grid-cols-[1.05fr_1fr] gap-5">
+      <!-- สแกนเนอร์ -->
+      <section class="glass panel-pad min-w-0">
+        <div class="scanner" id="scanner">
+          <div class="grid-floor"></div>
+          <video id="camVideo" playsinline muted hidden></video>
+          <div class="scan-idle" id="scanIdle">
+            <div>
+              <div class="holo-qr"><i class="fa-solid fa-qrcode"></i></div>
+              <p class="mt-4 font-semibold" style="font-family:var(--f-display)">กดเปิดกล้อง แล้วหันบัตรนักเรียนเข้ากรอบ</p>
+            </div>
+          </div>
+          <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+          <div class="laser"></div>
+          <div class="cam-status"><span id="camStatus">CAMERA · OFF</span></div>
+        </div>
+        <canvas id="scanCanvas" hidden></canvas>
+        <div class="flex flex-wrap gap-3 justify-center mt-5">
+          <button class="btn btn-primary" id="btnCam"><i class="fa-solid fa-camera"></i> เปิดกล้องสแกน</button>
+          <label class="btn btn-ghost" for="qrFile"><i class="fa-solid fa-image"></i> ถ่าย/เลือกรูป QR</label>
+          <input type="file" id="qrFile" accept="image/*" capture="environment" hidden>
+        </div>
+        <form id="manualForm" class="flex gap-3 mt-4" autocomplete="off">
+          <input class="input mono" id="manualSid" inputmode="numeric" placeholder="สแกนไม่ได้? กรอกรหัสนักเรียน" aria-label="รหัสนักเรียน">
+          <button class="btn btn-purple"><i class="fa-solid fa-check"></i> บันทึก</button>
+        </form>
+      </section>
+
+      <!-- ผลการสแกน -->
+      <section class="flex flex-col gap-5 min-w-0">
+        <div class="glass result" id="result"></div>
+        <div class="glass panel-pad">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="font-semibold text-lg"><i class="fa-solid fa-clock-rotate-left neon-blue"></i>&nbsp; สแกนล่าสุดจากเครื่องนี้</h2>
+            <span class="pill pill-green num" id="myCount">0 คน</span>
+          </div>
+          <div class="flex flex-col gap-2 mt-4" id="recent"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="shared.js?v=7"></script>
+<script>
+(() => {
+const {STATIONS, ST, DB, $, esc, fullName, initials, tFmt, store, parseQR, createCamera, beep, toast, flash, emblemSVG, CONFIG} = CAI;
+
+$('#brandEmblem').innerHTML = emblemSVG(false, 40);
+$('#modeBadge').innerHTML = DB.mode === 'remote'
+  ? '<span class="mode-badge mode-remote"><i class="fa-solid fa-cloud"></i> ออนไลน์</span>'
+  : '<span class="mode-badge mode-local"><i class="fa-solid fa-flask"></i> โหมดทดลอง</span>';
+
+/* ฐาน: ลิงก์ teacher.html#st3-xxxxxx จะเลือกฐานที่ 3 ให้อัตโนมัติ พร้อมรหัสกำกับฐาน (จำไว้ในเครื่องนี้) */
+const hm = location.hash.match(/^#st(\d+)(?:-([a-z0-9]+))?$/i) || [];
+const fromHash = +(hm[1] || 0);
+const tokens = store.get('ttr-teacher-tokens', {});
+if (ST[fromHash] && hm[2]) { tokens[fromHash] = hm[2].toLowerCase(); store.set('ttr-teacher-tokens', tokens); }
+const tokenFor = st => tokens[st] || '';
+let station = ST[fromHash] ? fromHash : (store.get('ttr-teacher-station', 1));
+if (!ST[station]) station = 1;
+$('#stationSel').innerHTML = STATIONS.map(s => `<option value="${s.id}">ฐานที่ ${s.id} · ${esc(s.name)}</option>`).join('');
+$('#stationSel').value = station;
+function renderStation(){
+  const s = ST[station];
+  $('#stationCard').innerHTML = `<div class="st-icon" style="--h:${s.h};width:48px;height:48px;font-size:20px"><i class="fa-solid ${s.icon}"></i></div>
+    <div class="min-w-0"><div class="text-xs faint">กำลังบันทึกเข้า</div><div style="font-family:var(--f-display);font-weight:700;font-size:18px">ฐานที่ ${s.id} · ${esc(s.name)}</div><div class="text-xs muted">${esc(s.th)} · ${esc(s.room)}</div>
+    ${DB.mode === 'remote' && !tokenFor(station) ? '<div class="text-xs mt-1" style="color:var(--amber)"><i class="fa-solid fa-key"></i> เครื่องนี้ยังไม่มีรหัสของฐานนี้ ให้เปิดจากลิงก์หรือ QR ประจำฐานที่ได้จาก Admin</div>' : ''}</div>`;
+  renderRecent();
+}
+$('#stationSel').addEventListener('change', e => { station = +e.target.value; store.set('ttr-teacher-station', station); renderStation(); showIdle(); });
+$('#teacherName').value = store.get('ttr-teacher-name', '');
+$('#teacherName').addEventListener('change', e => store.set('ttr-teacher-name', e.target.value.trim()));
+
+/* ประวัติการสแกนของเครื่องนี้ */
+let recent = store.get('ttr-teacher-recent', []);
+const STATUS_LABEL = {
+  ok:'<span class="text-xs neon-green">ผ่าน</span>',
+  dup:'<span class="text-xs" style="color:var(--amber)">ซ้ำ</span>',
+  pending:'<span class="text-xs neon-blue"><i class="fa-solid fa-clock"></i> รอส่ง</span>',
+  unknown:'<span class="text-xs" style="color:var(--red)">ไม่พบ</span>',
+  error:'<span class="text-xs" style="color:var(--red)">ผิดพลาด</span>',
+};
+function renderRecent(){
+  const rows = recent.filter(r => r.st === station).slice(0, 8);
+  $('#myCount').textContent = `${recent.filter(r => r.st === station && r.status === 'ok').length} คน`;
+  $('#recent').innerHTML = rows.length ? rows.map(r => `<div class="log-row">
+      <div class="mini-av">${r.status === 'unknown' ? '?' : esc(r.name.replace(/^(ด\.ช\.|ด\.ญ\.|นาย|นางสาว)/, '').slice(0,1) || '?')}</div>
+      <div class="min-w-0"><div class="truncate font-medium">${esc(r.name)}</div><div class="text-xs faint mono">${esc(r.sid)} · ${esc(r.cls || '')}</div></div>
+      <div class="text-right"><div class="text-xs mono muted">${tFmt(r.ts)}</div>${STATUS_LABEL[r.status] || STATUS_LABEL.error}</div></div>`).join('')
+    : '<div class="empty">ยังไม่มีการสแกนที่ฐานนี้จากเครื่องนี้</div>';
+}
+
+/* การ์ดผลลัพธ์ขนาดใหญ่: ชื่อนักเรียน + ชื่อฐาน */
+function showIdle(){
+  const s = ST[station];
+  $('#result').className = 'glass result';
+  $('#result').innerHTML = `<div class="eyebrow">ผลการสแกน</div>
+    <div class="mt-3 text-xl" style="font-family:var(--f-display);font-weight:600">รอสแกนบัตรนักเรียน</div>
+    <p class="muted text-sm mt-1">เมื่อสแกนสำเร็จ ชื่อนักเรียนและชื่อฐานจะแสดงที่นี่</p>
+    <div class="r-station" style="--h:${s.h}"><div class="st-icon"><i class="fa-solid ${s.icon}"></i></div><div><div class="text-xs faint">ฐานปัจจุบัน</div><div class="font-semibold">ฐานที่ ${s.id} · ${esc(s.name)}</div></div></div>`;
+}
+function showResult(r, sid){
+  const s = ST[station], el = $('#result'), stu = r.student;
+  const cls = r.status === 'ok' ? 'ok' : r.status === 'dup' ? 'dup' : 'err';
+  el.className = 'glass result result-in ' + cls;
+  void el.offsetWidth;
+  if (r.status === 'badtoken') {
+    el.innerHTML = `<span class="pill" style="color:var(--red);border:1px solid rgba(255,77,122,.4);background:rgba(255,77,122,.1)"><i class="fa-solid fa-key"></i> ไม่มีสิทธิ์บันทึกฐานนี้</span>
+      <div class="r-name mt-4" style="font-size:24px">ลิงก์ฐานไม่ถูกต้อง</div><p class="muted mt-2">เปิดหน้านี้จากลิงก์หรือ QR ประจำฐานที่ได้จาก Admin (แท็บ ตั้งค่า &amp; ลิงก์ครู) แล้วสแกนใหม่</p>`;
+    return;
+  }
+  if (r.status === 'unknown') {
+    el.innerHTML = `<span class="pill" style="color:var(--red);border:1px solid rgba(255,77,122,.4);background:rgba(255,77,122,.1)"><i class="fa-solid fa-xmark"></i> ไม่พบในระบบ</span>
+      <div class="r-name mt-4">รหัส ${esc(sid)}</div><p class="muted mt-2">ยังไม่ได้ลงทะเบียน ให้นักเรียนติดต่อจุดลงทะเบียน (Admin)</p>`;
+    return;
+  }
+  const left = Math.max(0, CONFIG.MIN_STATIONS - r.count);
+  el.innerHTML = `
+    <span class="pill ${cls === 'ok' ? 'pill-green' : 'pill-amber'}"><i class="fa-solid ${cls === 'ok' ? 'fa-circle-check' : 'fa-rotate-left'}"></i> ${cls === 'ok' ? 'บันทึกเข้าฐานสำเร็จ' : 'เคยเข้าฐานนี้แล้ว (ไม่นับซ้ำ)'}</span>
+    <div class="flex items-center gap-4 mt-4">
+      <div class="big-av">${esc(initials(stu))}</div>
+      <div class="min-w-0"><div class="r-name">${esc(fullName(stu))}</div><div class="muted mono text-sm mt-1">${esc(stu.cls)} · รหัส ${esc(stu.sid)}</div></div>
+    </div>
+    <div class="r-station" style="--h:${s.h}">
+      <div class="st-icon"><i class="fa-solid ${s.icon}"></i></div>
+      <div class="min-w-0 flex-1"><div class="text-xs faint">ฐานกิจกรรม</div><div class="font-semibold" style="font-family:var(--f-display);font-size:18px">ฐานที่ ${s.id} · ${esc(s.name)}</div></div>
+      <div class="text-right"><div class="mono" style="font-size:22px;font-weight:600">${r.count}<span class="faint text-sm">/${STATIONS.length}</span></div><div class="text-xs faint">ฐานที่ผ่าน</div></div>
+    </div>
+    <p class="text-sm mt-3 ${left ? 'muted' : 'neon-green'}">${left ? `อีก ${left} ฐานจะได้รับเกียรติบัตร` : '<i class="fa-solid fa-award"></i> ครบเงื่อนไขรับเกียรติบัตรแล้ว'}</p>`;
+}
+
+/* การ์ดตอนเน็ตหลุด: บันทึกไว้ในเครื่องแล้ว รอส่ง */
+function showPending(q){
+  const s = ST[q.st], el = $('#result');
+  el.className = 'glass result result-in pending';
+  void el.offsetWidth;
+  el.innerHTML = `
+    <span class="pill pill-blue"><i class="fa-solid fa-cloud-arrow-up"></i> บันทึกในเครื่องแล้ว · รอส่งเมื่อเน็ตกลับมา</span>
+    <div class="flex items-center gap-4 mt-4">
+      <div class="big-av">${esc((q.name || '').replace(/^(ด\.ช\.|ด\.ญ\.|นางสาว|นาย)/, '').slice(0, 1) || '#')}</div>
+      <div class="min-w-0"><div class="r-name">${esc(q.name || 'รหัส ' + q.sid)}</div><div class="muted mono text-sm mt-1">${q.cls ? esc(q.cls) + ' · ' : ''}รหัส ${esc(q.sid)}</div></div>
+    </div>
+    <div class="r-station" style="--h:${s.h}">
+      <div class="st-icon"><i class="fa-solid ${s.icon}"></i></div>
+      <div class="min-w-0 flex-1"><div class="text-xs faint">ฐานกิจกรรม</div><div class="font-semibold" style="font-family:var(--f-display);font-size:18px">ฐานที่ ${s.id} · ${esc(s.name)}</div></div>
+    </div>
+    <p class="text-sm mt-3 muted">ให้นักเรียนไปฐานต่อไปได้เลย ระบบจะส่งเองอัตโนมัติ${q.name ? '' : ' · กรอกรหัสเองตอนออฟไลน์ ระบบยังตรวจชื่อไม่ได้'}</p>`;
+}
+
+/* ================= คิวออฟไลน์ =================
+   ส่งไม่ถึงเซิร์ฟเวอร์ → เก็บลง localStorage แล้วส่งซ้ำเมื่อเน็ตกลับมา (ปิดหน้าแล้วเปิดใหม่ก็ยังอยู่)
+   ส่งซ้ำได้อย่างปลอดภัย เพราะเซิร์ฟเวอร์ไม่นับซ้ำฐานเดิมของนักเรียนคนเดิม */
+const QKEY = 'ttr-teacher-queue';
+let queue = store.get(QKEY, []), flushing = false;
+const saveQueue = () => { store.set(QKEY, queue); renderNet(); };
+const saveRecent = () => { recent = recent.slice(0, 80); store.set('ttr-teacher-recent', recent); renderRecent(); };
+function renderNet(){
+  if (DB.mode !== 'remote') { $('#netBar').hidden = true; return; }
+  const online = navigator.onLine;
+  $('#netBar').hidden = online && !queue.length;
+  $('#netBar').className = 'glass net-bar ' + (online ? (queue.length ? 'is-queue' : '') : 'is-off');
+  $('#netText').innerHTML = !online
+    ? `<b>ออฟไลน์</b> · สแกนต่อได้ ข้อมูลเก็บไว้ในเครื่อง${queue.length ? ` <span class="mono">(${queue.length} รายการ)</span>` : ''}`
+    : `<b>รอส่ง ${queue.length} รายการ</b> · ${flushing ? 'กำลังส่ง…' : 'จะส่งอัตโนมัติ'}`;
+  $('#btnFlush').hidden = !online || !queue.length || flushing;
+}
+async function flush(){
+  if (flushing || !queue.length || !navigator.onLine || DB.mode !== 'remote') return;
+  flushing = true; renderNet();
+  let sent = 0;
+  try {
+    while (queue.length) {
+      const q = queue[0];
+      let r;
+      try { r = await DB.checkin(q.sid, q.st, q.by, q.ts, q.tk || tokenFor(q.st)); }
+      catch(err) { if (err.network) break; r = {status:'error'}; }
+      queue.shift(); sent++;
+      const item = recent.find(x => x.qid === q.id);
+      if (item) { item.status = r.status; if (r.student) { item.name = fullName(r.student); item.cls = r.student.cls; } delete item.qid; }
+      store.set(QKEY, queue);
+    }
+  } finally { flushing = false; saveRecent(); renderNet(); }
+  if (sent) toast({title:`ส่งข้อมูลค้างแล้ว ${sent} รายการ`, body:queue.length ? `เหลืออีก ${queue.length} รายการ` : 'ข้อมูลครบทุกรายการ', icon:'fa-cloud-arrow-up'});
+}
+window.addEventListener('online', () => { renderNet(); flush(); });
+window.addEventListener('offline', renderNet);
+setInterval(flush, 15000);
+$('#btnFlush').addEventListener('click', flush);
+
+/* สแกน → บันทึก */
+let busy = false, lastRaw = '', lastAt = 0;
+async function handle(raw, source){
+  const now = Date.now();
+  if (busy || (source === 'camera' && raw === lastRaw && now - lastAt < 4000)) return;
+  lastRaw = raw; lastAt = now;
+  const qr = parseQR(raw);
+  const scanner = $('#scanner');
+  const mark = c => { scanner.classList.remove('hit','warn'); void scanner.offsetWidth; scanner.classList.add(c); setTimeout(() => scanner.classList.remove(c), 1200); };
+  if (!qr) { beep('err'); mark('warn'); toast({kind:'err', title:'QR นี้ไม่ใช่บัตรกิจกรรม', body:'ใช้ QR จากบัตร Station Pass เท่านั้น'}); return; }
+  const sid = qr.sid, by = $('#teacherName').value.trim() || ST[station].speaker;
+  busy = true; $('#camStatus').textContent = 'SAVING…';
+  try {
+    const r = await DB.checkin(sid, station, by, now, tokenFor(station));
+    showResult(r, sid);
+    if (r.status === 'ok') { beep('ok'); mark('hit'); flash(); }
+    else { beep(r.status === 'dup' ? 'dup' : 'err'); mark('warn'); }
+    recent.unshift({sid, name:r.student ? fullName(r.student) : 'ไม่พบในระบบ', cls:r.student ? r.student.cls : '', st:station, ts:now, status:r.status});
+    saveRecent();
+    flush();
+  } catch(err) {
+    if (err.network && DB.mode === 'remote') {
+      // ยังไม่ถึงเซิร์ฟเวอร์ → เก็บเข้าคิว (สแกนซ้ำคนเดิมฐานเดิมไม่ต้องเก็บซ้ำ)
+      const already = queue.some(q => q.sid === sid && q.st === station) || recent.some(x => x.sid === sid && x.st === station && x.status === 'ok');
+      if (already) { beep('dup'); mark('warn'); toast({kind:'warn', title:'สแกนคนนี้ที่ฐานนี้ไปแล้ว', body:'ไม่ต้องสแกนซ้ำ'}); return; }
+      const q = {id:now + '-' + sid, sid, st:station, by, ts:now, name:qr.name, cls:qr.cls, tk:tokenFor(station)};
+      queue.push(q); saveQueue();
+      recent.unshift({sid, name:qr.name || 'รหัส ' + sid, cls:qr.cls, st:station, ts:now, status:'pending', qid:q.id});
+      saveRecent();
+      showPending(q); beep('ok'); mark('hit');
+    } else {
+      beep('err'); mark('warn');
+      if (err.code === 'bad_token') showResult({status:'badtoken'}, sid);
+      toast({kind:'err', title:'บันทึกไม่สำเร็จ', body:esc(err.message)});
+      lastRaw = '';
+    }
+  } finally { busy = false; $('#camStatus').textContent = cam.on ? 'CAMERA · LIVE' : 'CAMERA · OFF'; }
+}
+
+const cam = createCamera({
+  video:$('#camVideo'), canvas:$('#scanCanvas'),
+  onCode: data => handle(data, 'camera'),
+  onState: st => {
+    const map = {off:'CAMERA · OFF', requesting:'CAMERA · REQUESTING', live:'CAMERA · LIVE', blocked:'CAMERA · BLOCKED', unavailable:'CAMERA · NOT AVAILABLE'};
+    $('#camStatus').textContent = map[st] || st;
+    $('#scanIdle').hidden = st === 'live';
+    $('#btnCam').innerHTML = st === 'live' ? '<i class="fa-solid fa-stop"></i> ปิดกล้อง' : '<i class="fa-solid fa-camera"></i> เปิดกล้องสแกน';
+    if (st === 'blocked' || st === 'unavailable') toast({kind:'warn', title:'เปิดกล้องไม่ได้', body:'อนุญาตสิทธิ์กล้องในเบราว์เซอร์ (หน้าเว็บต้องเป็น https) หรือใช้ปุ่มถ่าย/เลือกรูป QR แทน'});
+  },
+});
+$('#btnCam').addEventListener('click', () => cam.on ? cam.stop() : cam.start());
+$('#qrFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { await handle(await CAI.decodeImageFile(f), 'file'); }
+  catch(err) { beep('err'); toast({kind:'err', title:'อ่าน QR ไม่สำเร็จ', body:esc(err.message)}); }
+});
+$('#manualForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#manualSid').value.trim(); if (!v) return;
+  $('#manualSid').value = ''; handle(v, 'manual');
+});
+
+renderStation(); showIdle(); renderNet(); flush();
+})();
+</script>
+</body>
+</html>
