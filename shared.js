@@ -540,15 +540,43 @@ async function snap(el, scale = 2){
   try { return await html2canvas(el, {scale, backgroundColor:null, useCORS:true, logging:false}); }
   finally { holders.forEach(h => h.style.transform = h.dataset.prevT || ''); }
 }
+/* ================= กล่อง "กำลังโหลด" กลางจอ =================
+   ใช้กับทุกการกดที่ต้องรอเซิร์ฟเวอร์: ขึ้นกล่องกลางจอ และกดหรือพิมพ์อย่างอื่นไม่ได้จนกว่าจะเสร็จ
+   (การอัปเดตเบื้องหลังอัตโนมัติจะไม่เรียกใช้ ไม่งั้นหน้าจอจะล็อกบ่อย) */
+let loadingN = 0;
+function showLoading(text){
+  loadingN++;
+  let el = $('#globalLoading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'globalLoading'; el.className = 'g-loading';
+    el.setAttribute('role', 'alert'); el.setAttribute('aria-busy', 'true');
+    el.innerHTML = '<div class="g-box glass"><span class="spinner g-spin" aria-hidden="true"></span><div class="g-text"></div></div>';
+    document.body.appendChild(el);
+  }
+  $('.g-text', el).innerHTML = text || 'กำลังโหลด…';
+  el.hidden = false;
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+function hideLoading(){
+  loadingN = Math.max(0, loadingN - 1);
+  if (!loadingN) { const el = $('#globalLoading'); if (el) el.hidden = true; }
+}
+async function withLoading(text, fn){ showLoading(text); try { return await fn(); } finally { hideLoading(); } }
+const isLoading = () => loadingN > 0;
+// ระหว่างโหลด: กันการกดแป้นพิมพ์ (Enter/Space) ส่งฟอร์มซ้ำ
+document.addEventListener('keydown', e => { if (loadingN > 0) { e.preventDefault(); e.stopPropagation(); } }, true);
+
 async function exportPng(el, name, scale = 2){
-  try { const c = await snap(el, scale); download(c.toDataURL('image/png'), name); toast({title:'บันทึก PNG แล้ว', body:esc(name), icon:'fa-image'}); }
+  try { const c = await withLoading('กำลังสร้างไฟล์ภาพ…', () => snap(el, scale)); download(c.toDataURL('image/png'), name); toast({title:'บันทึก PNG แล้ว', body:esc(name), icon:'fa-image'}); }
   catch(err) { toast({kind:'err', title:'บันทึกภาพไม่สำเร็จ', body:esc(err.message)}); }
 }
 async function exportPdf(s){
   try {
-    toast({title:'กำลังสร้าง PDF…', icon:'fa-spinner'});
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-    const c = await snap($('#certificate'), 3);
+    const c = await withLoading('กำลังสร้างไฟล์ PDF…', async () => {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      return snap($('#certificate'), 3);
+    });
     const pdf = new window.jspdf.jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
     pdf.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 297, 210);
     pdf.save(`certificate-${s.sid}.pdf`);
@@ -556,7 +584,7 @@ async function exportPdf(s){
   } catch(err) { toast({kind:'err', title:'สร้าง PDF ไม่สำเร็จ', body:esc(err.message)}); }
 }
 
-window.CAI = {levelText, parseStudentReport, SURVEY, verifyUrl, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, parseQR, certCode, visitedMap,
+window.CAI = {showLoading, hideLoading, withLoading, isLoading, levelText, parseStudentReport, SURVEY, verifyUrl, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, parseQR, certCode, visitedMap,
   drawQR, decodeImageFile, createCamera, beep, toast, flash, emblemSVG, GOLD_DEFS, loadScript, download,
   passHTML, mountPass, gaugeSVG, certificateHTML, mountCertificate, prepareCertPrint, exportPng, exportPdf};
 })();

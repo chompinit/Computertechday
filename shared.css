@@ -532,3 +532,12 @@ table.data tbody tr[aria-selected="true"]{background:linear-gradient(90deg, rgba
 .next-st{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);min-width:0;width:100%}
 .st-edit-row{cursor:pointer;transition:border-color .2s, background .2s}
 .st-edit-row:hover{border-color:var(--h);background:rgba(255,255,255,.06)}
+
+/* Global blocking loader */
+.g-loading{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:16px;background:rgba(2,3,10,.62);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);cursor:progress;animation:gFade .15s ease}
+@keyframes gFade{from{opacity:0}}
+.g-box{display:flex;align-items:center;gap:16px;padding:20px 24px;border-radius:20px;max-width:min(92vw,460px);border-color:rgba(45,226,255,.45);box-shadow:0 0 50px -10px rgba(45,226,255,.5), 0 30px 60px -20px #000}
+.g-spin{width:34px;height:34px;border-width:4px}
+.g-text{font-family:var(--f-display);font-weight:600;font-size:17px;line-height:1.35;min-width:0}
+.g-name{font-size:clamp(20px,5vw,26px);font-weight:700;line-height:1.2;word-break:break-word}
+.g-sub{font-family:var(--f-body);font-weight:400;font-size:13.5px;color:var(--ink-dim);margin-top:4px}

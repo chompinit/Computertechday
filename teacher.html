@@ -10,7 +10,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=13">
+<link rel="stylesheet" href="shared.css?v=14">
 <style>
   body{margin:0}
   .scanner{max-width:520px;transform:none}
@@ -105,10 +105,10 @@
   </main>
 </div>
 
-<script src="shared.js?v=13"></script>
+<script src="shared.js?v=14"></script>
 <script>
 (() => {
-const {STATIONS, ST, DB, $, esc, fullName, initials, tFmt, store, parseQR, createCamera, beep, toast, flash, emblemSVG, CONFIG} = CAI;
+const {showLoading, hideLoading, withLoading, STATIONS, ST, DB, $, esc, fullName, initials, tFmt, store, parseQR, createCamera, beep, toast, flash, emblemSVG, CONFIG} = CAI;
 
 $('#brandEmblem').innerHTML = emblemSVG(false, 40);
 $('#modeBadge').innerHTML = DB.mode === 'remote'
@@ -250,7 +250,7 @@ async function flush(){
 window.addEventListener('online', () => { renderNet(); flush(); });
 window.addEventListener('offline', renderNet);
 setInterval(flush, 15000);
-$('#btnFlush').addEventListener('click', flush);
+$('#btnFlush').addEventListener('click', () => withLoading('กำลังส่งข้อมูลที่ค้างอยู่…', flush));
 
 /* สแกน → บันทึก */
 let busy = false, lastRaw = '', lastAt = 0;
@@ -263,7 +263,16 @@ async function handle(raw, source){
   const mark = c => { scanner.classList.remove('hit','warn'); void scanner.offsetWidth; scanner.classList.add(c); setTimeout(() => scanner.classList.remove(c), 1200); };
   if (!qr) { beep('err'); mark('warn'); toast({kind:'err', title:'QR นี้ไม่ใช่บัตรกิจกรรม', body:'ใช้ QR จากบัตร Station Pass เท่านั้น'}); return; }
   const sid = qr.sid, by = $('#teacherName').value.trim() || ST[station].speaker;
+  // เคยบันทึกคนนี้ที่ฐานนี้จากเครื่องนี้แล้ว → แจ้งทันที ไม่ต้องรอเซิร์ฟเวอร์
+  const prev = recent.find(x => x.sid === sid && x.st === station && (x.status === 'ok' || x.status === 'dup' || x.status === 'pending'));
+  if (prev) {
+    beep('dup'); mark('warn');
+    showResult({status:'dup', student:{sid, prefix:'', first:prev.name, last:'', cls:prev.cls}, count:recent.filter(x => x.sid === sid && x.status === 'ok').length || '-'}, sid);
+    return;
+  }
   busy = true; $('#camStatus').textContent = 'SAVING…';
+  // ชื่อนักเรียนอ่านจาก QR ได้เลย → แสดงทันทีในกล่องกำลังบันทึก
+  showLoading(`<div class="g-name">${esc(qr.name || 'รหัส ' + sid)}</div><div class="g-sub">${qr.cls ? esc(qr.cls) + ' · ' : ''}กำลังบันทึกเข้าฐานที่ ${station} · ${esc(ST[station].name)}</div>`);
   try {
     const r = await DB.checkin(sid, station, by, now, tokenFor(station));
     showResult(r, sid);
@@ -288,7 +297,7 @@ async function handle(raw, source){
       toast({kind:'err', title:'บันทึกไม่สำเร็จ', body:esc(err.message)});
       lastRaw = '';
     }
-  } finally { busy = false; $('#camStatus').textContent = cam.on ? 'CAMERA · LIVE' : 'CAMERA · OFF'; }
+  } finally { hideLoading(); busy = false; $('#camStatus').textContent = cam.on ? 'CAMERA · LIVE' : 'CAMERA · OFF'; }
 }
 
 const cam = createCamera({

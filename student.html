@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=13">
+<link rel="stylesheet" href="shared.css?v=14">
 <style>
   body{margin:0}
   .login{max-width:440px;margin-inline:auto}
@@ -98,10 +98,10 @@
 </div>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=13"></script>
+<script src="shared.js?v=14"></script>
 <script>
 (() => {
-const {SURVEY, CONFIG, STATIONS, ST, DB, $, esc, fullName, tFmt, store, parseQR, qrPayload, drawQR, decodeImageFile, toast, emblemSVG, gaugeSVG, mountPass, mountCertificate, prepareCertPrint} = CAI;
+const {withLoading, SURVEY, CONFIG, STATIONS, ST, DB, $, esc, fullName, tFmt, store, parseQR, qrPayload, drawQR, decodeImageFile, toast, emblemSVG, gaugeSVG, mountPass, mountCertificate, prepareCertPrint} = CAI;
 const MIN = CONFIG.MIN_STATIONS;
 const KEY = 'ttr-student-login';
 let me = null, lastKey = '', curStudent = null;
@@ -137,11 +137,11 @@ $('#brandEmblem').innerHTML = emblemSVG(false, 40);
 $('#minTxt').textContent = MIN;
 if (DB.mode === 'local') $('#demoHint').innerHTML = 'โหมดทดลอง: ถ้ายังไม่ได้นำเข้ารายชื่อจริง ลองเลข <span class="mono">65215</span> (ครบแล้ว) หรือ <span class="mono">65102</span> (ยังไม่ครบ)';
 
-async function login(sid, {silent = false} = {}){
+async function login(sid, {silent = false, loading = !silent} = {}){
   const msg = $('#loginMsg');
-  if (!silent) msg.textContent = 'กำลังค้นหา…';
+  if (!silent) msg.textContent = '';
   try {
-    const r = await DB.studentView(sid);
+    const r = loading ? await withLoading('กำลังโหลดข้อมูลของคุณ…', () => DB.studentView(sid)) : await DB.studentView(sid);
     if (!r) { if (!silent) msg.innerHTML = '<span style="color:var(--red)">ไม่พบเลขประจำตัวนี้ ตรวจสอบตัวเลขอีกครั้ง</span>'; store.set(KEY, null); showLogin(); return; }
     me = {sid}; store.set(KEY, me);
     msg.textContent = '';
@@ -169,7 +169,7 @@ $('#qrFile').addEventListener('change', async e => {
   } catch(err) { $('#loginMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
 });
 $('#btnLogout').addEventListener('click', () => { store.set(KEY, null); $('#sid').value = ''; showLogin(); });
-$('#btnRefresh').addEventListener('click', () => me && login(me.sid, {silent:true}));
+$('#btnRefresh').addEventListener('click', () => me && login(me.sid, {silent:true, loading:true}));
 
 /* แบบประเมินก่อนรับเกียรติบัตร */
 function surveyHTML(v){
@@ -201,7 +201,7 @@ function bindSurvey(s){
     if (missing.length) { $('#svMsg').innerHTML = `<span style="color:var(--red)">ให้คะแนนให้ครบทุกข้อ (ยังขาด ${missing.length} ข้อ)</span>`; return; }
     $('#svMsg').textContent = 'กำลังส่ง…';
     try {
-      await DB.survey(me.sid, {...answers, fav:$('#svFav').value, comment:$('#svComment').value.trim()});
+      await withLoading('กำลังส่งแบบประเมิน…', () => DB.survey(me.sid, {...answers, fav:$('#svFav').value, comment:$('#svComment').value.trim()}));
       toast({title:'ขอบคุณที่ตอบแบบประเมิน', body:'ดาวน์โหลดเกียรติบัตรได้เลย', icon:'fa-award'});
       lastKey = ''; login(me.sid, {silent:true});
     } catch(err) { $('#svMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)} ลองอีกครั้ง</span>`; }
@@ -268,7 +268,7 @@ if (DB.mode === 'local') DB.subscribe(() => me && login(me.sid, {silent:true}));
 else setInterval(() => { if (me && !document.hidden) login(me.sid, {silent:true}); }, 20000);
 
 const saved = store.get(KEY, null);
-if (saved && saved.sid) { $('#sid').value = saved.sid; login(saved.sid, {silent:true}); }
+if (saved && saved.sid) { $('#sid').value = saved.sid; login(saved.sid, {silent:true, loading:true}); }
 })();
 </script>
 </body>

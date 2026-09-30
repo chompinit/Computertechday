@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=13">
+<link rel="stylesheet" href="shared.css?v=14">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -264,10 +264,10 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=13"></script>
+<script src="shared.js?v=14"></script>
 <script>
 (() => {
-const {parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
+const {withLoading, parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
   drawQR, decodeImageFile, beep, toast, emblemSVG, download, mountPass, gaugeSVG, mountCertificate, prepareCertPrint, exportPng} = CAI;
 const MIN = CONFIG.MIN_STATIONS;
 let D = {students:{}, checkins:[]}, VM = {};
@@ -289,7 +289,7 @@ $('#gateForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = $('#gateMsg');
   msg.textContent = 'กำลังตรวจสอบ…';
-  try { await DB.login($('#pin').value.trim()); enter(); }
+  try { await withLoading('กำลังตรวจสอบรหัส…', () => DB.login($('#pin').value.trim())); enter(); }
   catch(err) { msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; const c = $('.gate-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
 });
 $('#btnLogout').addEventListener('click', () => { DB.logout(); location.reload(); });
@@ -302,7 +302,7 @@ async function enter(){
   go(TABS.some(t => t.v === h) ? h : 'dashboard', false);
   DB.stationTokens().then(t => { TOKENS = t || {}; keys.links = null; if (view === 'settings') renderSettings(); })
     .catch(err => toast({kind:'warn', title:'โหลดรหัสลิงก์ครูไม่ได้', body:esc(err.message) + ' · กดรีเฟรชหน้าเพื่อลองใหม่'}));
-  await refresh();
+  await withLoading('กำลังโหลดข้อมูลจาก Google Sheets…<div class="g-sub">ครั้งแรกอาจใช้ 10–20 วินาที</div>', refresh);
   $('#loadingBar').hidden = true;
   DB.subscribe(refresh);
   DB._onLocal = refresh;
@@ -528,7 +528,7 @@ $('#stForm').addEventListener('submit', async e => {
   if (!name) { $('#stmMsg').innerHTML = '<span style="color:var(--red)">ต้องมีชื่อฐาน</span>'; return; }
   $('#stmMsg').textContent = 'กำลังบันทึก…';
   try {
-    await DB.saveStation({id:editingSt.id, name, th:$('#stmTh').value.trim(), speaker:$('#stmSpeaker').value.trim(), room:$('#stmRoom').value.trim(), desc:$('#stmDesc').value.trim()});
+    await withLoading('กำลังบันทึกข้อมูลฐาน…', () => DB.saveStation({id:editingSt.id, name, th:$('#stmTh').value.trim(), speaker:$('#stmSpeaker').value.trim(), room:$('#stmRoom').value.trim(), desc:$('#stmDesc').value.trim()}));
     toast({title:`บันทึกฐานที่ ${editingSt.id} แล้ว`, body:esc(name), icon:'fa-floppy-disk'});
     closeSt();
   } catch(err) { $('#stmMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
@@ -623,7 +623,7 @@ function renderDetail(){
 $('#detail').addEventListener('click', async e => {
   const b = e.target.closest('[data-uncheck]'); if (!b) return;
   if (!b.dataset.armed) { b.dataset.armed = 1; b.innerHTML = 'ยืนยันลบ?'; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.innerHTML = '<i class="fa-solid fa-xmark"></i>'; } }, 3000); return; }
-  try { await DB.removeCheckin(focusSid, +b.dataset.uncheck); keys.detail = null; await refresh(); toast({title:'ยกเลิกการเช็กอินแล้ว', icon:'fa-rotate-left'}); }
+  try { await withLoading('กำลังยกเลิกการเช็กอิน…', async () => { await DB.removeCheckin(focusSid, +b.dataset.uncheck); keys.detail = null; await refresh(); }); toast({title:'ยกเลิกการเช็กอินแล้ว', icon:'fa-rotate-left'}); }
   catch(err) { toast({kind:'err', title:'ลบไม่สำเร็จ', body:esc(err.message)}); }
 });
 
@@ -635,8 +635,7 @@ $('#regForm').addEventListener('submit', async e => {
   if (!/^[A-Za-z0-9]{4,10}$/.test(sid)) { msg.innerHTML = '<span style="color:var(--red)">กรอกเลขประจำตัว 4–10 หลัก (ตัวเลขหรือตัวอักษรอังกฤษ)</span>'; $('#rSid').focus(); return; }
   if (!first || !last) { msg.innerHTML = '<span style="color:var(--red)">กรอกชื่อและนามสกุลให้ครบ</span>'; return; }
   try {
-    const r = await DB.register({sid, prefix:$('#rPrefix').value, first, last, cls:`${$('#rLevel').value}/${room}`});
-    focusSid = sid; await refresh();
+    const r = await withLoading('กำลังลงทะเบียน…', async () => { const x = await DB.register({sid, prefix:$('#rPrefix').value, first, last, cls:`${$('#rLevel').value}/${room}`}); focusSid = sid; await refresh(); return x; });
     if (r.status === 'exists') { msg.innerHTML = `<span style="color:var(--amber)">รหัส ${esc(sid)} ลงทะเบียนไว้แล้ว แสดงบัตรเดิมให้</span>`; return; }
     msg.innerHTML = '<span class="neon-green"><i class="fa-solid fa-circle-check"></i> สร้างบัตรเรียบร้อย</span>';
     toast({title:'ลงทะเบียนสำเร็จ', body:esc(fullName(r.student)), icon:'fa-id-card'}); beep('ok');
@@ -654,7 +653,7 @@ $('#xlsxFile').addEventListener('change', async e => {
     const {students, skip} = parseStudentReport(rows);
     if (!students.length) throw new Error('ไม่พบนักเรียนที่นำเข้าได้ในไฟล์นี้');
     msg.textContent = `กำลังนำเข้า ${students.length} คน…`;
-    const r = await DB.importMany(students); keys.dl = null; await refresh();
+    const r = await withLoading(`กำลังนำเข้านักเรียน ${students.length} คน…`, async () => { const x = await DB.importMany(students); keys.dl = null; await refresh(); return x; });
     msg.innerHTML = `<span class="neon-green">เพิ่ม ${r.added} คน</span>${r.skipped ? ` · มีอยู่แล้ว ${r.skipped} คน` : ''}`
       + ` <span class="faint">· ข้ามอนุบาล ${skip.kinder} · ลาออก/จำหน่าย ${skip.inactive}${skip.invalid ? ' · ข้อมูลไม่ครบ ' + skip.invalid : ''}${r.removedDemo ? ' · ลบนักเรียนตัวอย่าง ' + r.removedDemo : ''}</span>`;
     toast({title:`นำเข้านักเรียน ${r.added} คน`, icon:'fa-file-excel'});
@@ -670,7 +669,7 @@ $('#btnImport').addEventListener('click', async () => {
   });
   if (!list.length) { $('#bulkMsg').innerHTML = '<span style="color:var(--red)">ไม่พบข้อมูลที่ถูกรูปแบบ</span>'; return; }
   try {
-    const r = await DB.importMany(list); await refresh();
+    const r = await withLoading(`กำลังนำเข้านักเรียน ${list.length} คน…`, async () => { const x = await DB.importMany(list); await refresh(); return x; });
     $('#bulkMsg').innerHTML = `<span class="neon-green">เพิ่ม ${r.added} คน</span>${r.skipped ? ` · ข้าม ${r.skipped} คน (มีอยู่แล้ว)` : ''}${bad.length ? ` · <span style="color:var(--amber)">แถวที่อ่านไม่ได้: ${bad.join(', ')}</span>` : ''}`;
     if (r.added) $('#bulk').value = '';
   } catch(err) { $('#bulkMsg').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; }
