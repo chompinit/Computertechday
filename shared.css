@@ -459,6 +459,16 @@ table.data tbody tr[aria-selected="true"]{background:linear-gradient(90deg, rgba
 .poster .p-th{font-size:10pt;color:#444}
 .poster .q img,.poster .q canvas{width:62mm;height:62mm;display:block;margin:3mm auto}
 .poster .p-note{font-size:8.5pt;color:#555;line-height:1.4}
+/* Design name cards (card-front.jpg, A4 portrait, 4 per page) */
+.dcards{page:sheet}
+.dpage{position:relative;width:210mm;height:297mm;overflow:hidden;break-after:page;page-break-after:always}
+.dpage:last-child{break-after:auto;page-break-after:auto}
+.dpage .dbg{position:absolute;inset:0;width:210mm;height:297mm;display:block}
+.dpage .dq{position:absolute;left:122.85mm;width:22.3mm;height:22.3mm;background:#fff}
+.dpage .dq img,.dpage .dq canvas{width:22.3mm;height:22.3mm;display:block}
+.dpage .dname,.dpage .dcls{position:absolute;left:155.4mm;width:42.3mm;text-align:center;white-space:nowrap;overflow:hidden;line-height:1}
+.dpage .dname{height:7.6mm;line-height:7.6mm;font-family:'Chakra Petch','IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:4.6mm;color:#0a2a78}
+.dpage .dcls{height:3.6mm;line-height:3.6mm;font-family:'IBM Plex Sans Thai','Chakra Petch',sans-serif;font-weight:600;font-size:2.7mm;color:#1d4fd8}
 /* Student QR poster (A4 portrait, 1 per page) */
 .sheet.big-poster{display:block;padding:0}
 .bigp{height:297mm;box-sizing:border-box;padding:16mm 18mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3mm;border-top:6mm solid #00b8d9;border-bottom:6mm solid #7c4dff}

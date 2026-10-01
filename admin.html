@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=16">
+<link rel="stylesheet" href="shared.css?v=17">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -175,6 +175,12 @@
               <select class="input w-auto" id="sheetClass" aria-label="เลือกห้อง"></select>
               <button class="btn btn-gold" id="btnSheet"><i class="fa-solid fa-print"></i> พิมพ์บัตร</button>
             </div>
+            <h3 class="h-sec mt-6">พิมพ์บัตรดีไซน์งาน (A4 · 4 ใบ/แผ่น)</h3>
+            <p class="text-sm muted mt-1">ใส่ QR ชื่อ-นามสกุล และชั้นลงในบัตรดีไซน์ Computer &amp; AI Innovation ให้อัตโนมัติ แต่ละห้องเริ่มแผ่นใหม่ · ตั้งค่าพิมพ์: A4, ขนาดจริง (100%), ไม่มีขอบ</p>
+            <div class="flex flex-wrap gap-3 mt-4">
+              <button class="btn btn-gold" id="btnDesignClass"><i class="fa-solid fa-id-card"></i> พิมพ์ห้องที่เลือก</button>
+              <button class="btn btn-ghost" id="btnDesignAll"><i class="fa-solid fa-layer-group"></i> พิมพ์ทุกห้อง</button>
+            </div>
           </div>
         </div>
       </div>
@@ -268,7 +274,7 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=16"></script>
+<script src="shared.js?v=17"></script>
 <script>
 (() => {
 const {withLoading, parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
@@ -876,6 +882,39 @@ $$('[data-xlsx]').forEach(b => b.addEventListener('click', async () => {
   try { await withLoading('กำลังสร้างไฟล์ Excel…', exportXlsx); toast({title:'ดาวน์โหลด Excel แล้ว', icon:'fa-file-excel'}); }
   catch(err) { toast({kind:'err', title:'สร้างไฟล์ไม่สำเร็จ', body:esc(err.message)}); }
 }));
+
+/* บัตรดีไซน์งาน (card-front.jpg = ดีไซน์ A4 4 ใบ/แผ่น) → วาง QR + ชื่อ + ชั้น ลงช่องของแต่ละใบ · แต่ละห้องเริ่มแผ่นใหม่ */
+const CARD_ROWS = [0, 74.27, 148.6, 222.68]; // ระยะเลื่อนลงของใบที่ 1–4 (มม.)
+function printDesignCards(list){
+  const byRoom = new Map();
+  list.sort(byClass).forEach(s => { if (!byRoom.has(s.cls)) byRoom.set(s.cls, []); byRoom.get(s.cls).push(s); });
+  const pages = [];
+  byRoom.forEach(g => { for (let i = 0; i < g.length; i += 4) pages.push(g.slice(i, i + 4)); });
+  const root = $('#printRoot');
+  root.innerHTML = `<div class="dcards">${pages.map(p => `<div class="dpage"><img class="dbg" src="card-front.jpg" alt="">
+    ${p.map((s, i) => `<div class="dq" style="top:${(27.8 + CARD_ROWS[i]).toFixed(2)}mm" data-q="${esc(qrPayload(s))}"></div>
+      <div class="dname" style="top:${(29.9 + CARD_ROWS[i]).toFixed(2)}mm">${esc(fullName(s))}</div>
+      <div class="dcls" style="top:${(37.95 + CARD_ROWS[i]).toFixed(2)}mm">ชั้น ${esc(s.cls)} · รหัส ${esc(s.sid)}</div>`).join('')}</div>`).join('')}</div>`;
+  $$('[data-q]', root).forEach(el => drawQR(el, el.dataset.q, 220, '#000'));
+  root.dataset.kind = 'sheet';
+  // วัดขนาดตัวอักษรจริงตอนแสดงผล แล้วย่อชื่อที่ยาวเกินช่องให้พอดี
+  root.style.cssText = 'display:block;position:fixed;left:-9999px;top:0';
+  $$('.dname, .dcls', root).forEach(el => { let f = parseFloat(getComputedStyle(el).fontSize); while (el.scrollWidth > el.clientWidth + 1 && f > 6) el.style.fontSize = (f -= 0.5) + 'px'; });
+  root.style.cssText = '';
+  const img = $('.dbg', root);
+  const go = () => setTimeout(() => window.print(), 300);
+  img.complete ? go() : (img.onload = go, img.onerror = () => toast({kind:'err', title:'โหลดภาพพื้นหลังบัตรไม่สำเร็จ'}));
+}
+$('#btnDesignClass').addEventListener('click', () => {
+  const cls = $('#sheetClass').value, list = Object.values(D.students).filter(s => s.cls === cls);
+  if (!list.length) return toast({kind:'warn', title:'ห้องนี้ยังไม่มีนักเรียน'});
+  printDesignCards(list);
+});
+$('#btnDesignAll').addEventListener('click', () => {
+  const list = Object.values(D.students);
+  if (!list.length) return toast({kind:'warn', title:'ยังไม่มีนักเรียน'});
+  printDesignCards(list);
+});
 
 /* ================= Boot ================= */
 if (DB.hasKey()) enter();
