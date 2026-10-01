@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=18">
+<link rel="stylesheet" href="shared.css?v=19">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -274,7 +274,7 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=18"></script>
+<script src="shared.js?v=19"></script>
 <script>
 (() => {
 const {withLoading, parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
@@ -893,13 +893,15 @@ function printDesignCards(list){
   const root = $('#printRoot');
   root.innerHTML = `<div class="dcards">${pages.map(p => `<div class="dpage"><img class="dbg" src="card-front.jpg" alt="">
     ${p.map((s, i) => `<div class="dq" style="top:${(27.8 + CARD_ROWS[i]).toFixed(2)}mm" data-q="${esc(qrPayload(s))}"></div>
-      <div class="dname" style="top:${(31.99 + CARD_ROWS[i]).toFixed(2)}mm">${esc(fullName(s))}</div>
-      <div class="dcls" style="top:${(38.32 + CARD_ROWS[i]).toFixed(2)}mm">ชั้น ${esc(s.cls)} · รหัส ${esc(s.sid)}</div>`).join('')}</div>`).join('')}</div>`;
+      <div class="dbox" style="top:${(32.1 + CARD_ROWS[i]).toFixed(2)}mm">
+        <div class="dname">${esc(fullName(s))}</div>
+        <div class="dcls"><span>${esc(s.cls)}</span><b>รหัส ${esc(s.sid)}</b></div>
+      </div>`).join('')}</div>`).join('')}</div>`;
   $$('[data-q]', root).forEach(el => drawQR(el, el.dataset.q, 220, '#000'));
   root.dataset.kind = 'sheet';
   // วัดขนาดตัวอักษรจริงตอนแสดงผล แล้วย่อชื่อที่ยาวเกินช่องให้พอดี
   root.style.cssText = 'display:block;position:fixed;left:-9999px;top:0';
-  $$('.dname, .dcls', root).forEach(el => { let f = parseFloat(getComputedStyle(el).fontSize); while (el.scrollWidth > el.clientWidth + 1 && f > 6) el.style.fontSize = (f -= 0.5) + 'px'; });
+  $$('.dname, .dcls', root).forEach(el => { let f = parseFloat(getComputedStyle(el).fontSize); while (el.scrollWidth > el.parentNode.clientWidth + 1 && f > 6) el.style.fontSize = (f -= 0.5) + 'px'; });
   root.style.cssText = '';
   const img = $('.dbg', root);
   const go = () => setTimeout(() => window.print(), 300);

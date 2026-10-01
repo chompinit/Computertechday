@@ -464,11 +464,13 @@ table.data tbody tr[aria-selected="true"]{background:linear-gradient(90deg, rgba
 .dpage{position:relative;width:210mm;height:297mm;overflow:hidden;break-after:page;page-break-after:always}
 .dpage:last-child{break-after:auto;page-break-after:auto}
 .dpage .dbg{position:absolute;inset:0;width:210mm;height:297mm;display:block}
-.dpage .dq{position:absolute;left:122.85mm;width:22.3mm;height:22.3mm;background:#fff}
-.dpage .dq img,.dpage .dq canvas{width:22.3mm;height:22.3mm;display:block}
-.dpage .dname,.dpage .dcls{position:absolute;left:155.4mm;width:42.3mm;text-align:center;white-space:nowrap}
-.dpage .dname{height:5.4mm;line-height:5.4mm;font-family:'Chakra Petch','IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:4.4mm;color:#0a2a78}
-.dpage .dcls{height:2.9mm;line-height:2.9mm;font-family:'IBM Plex Sans Thai','Chakra Petch',sans-serif;font-weight:600;font-size:2.35mm;color:#1d4fd8}
+.dpage .dq{position:absolute;left:122.85mm;width:22.3mm;height:22.3mm;background:#fff;overflow:hidden}
+.dpage .dq img,.dpage .dq canvas{width:108%;height:108%;margin:-4%;display:block}
+/* กล่องชื่อ: ทาสีขาวทับเส้นจุดเดิม แล้วจัดชื่อ + ป้ายชั้นให้อยู่กลางกล่อง */
+.dpage .dbox{position:absolute;left:155.5mm;width:42mm;height:8.9mm;background:#fff;border-radius:1.2mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.9mm}
+.dpage .dname{max-width:100%;white-space:nowrap;line-height:1.15;font-family:'Chakra Petch','IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:4.8mm;color:#0a2a78}
+.dpage .dcls{display:inline-flex;align-items:center;gap:1.2mm;white-space:nowrap;padding:.45mm 2.2mm;border-radius:99px;background:linear-gradient(90deg,#1d4fd8,#2f7cf6);color:#fff;font-family:'IBM Plex Sans Thai','Chakra Petch',sans-serif;font-weight:600;font-size:2.4mm;line-height:1.25}
+.dpage .dcls b{font-weight:600;opacity:.85;padding-left:1.2mm;border-left:.25mm solid rgba(255,255,255,.55)}
 /* Student QR poster (A4 portrait, 1 per page) */
 .sheet.big-poster{display:block;padding:0}
 .bigp{height:297mm;box-sizing:border-box;padding:16mm 18mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3mm;border-top:6mm solid #00b8d9;border-bottom:6mm solid #7c4dff}
