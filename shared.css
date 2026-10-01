@@ -459,6 +459,15 @@ table.data tbody tr[aria-selected="true"]{background:linear-gradient(90deg, rgba
 .poster .p-th{font-size:10pt;color:#444}
 .poster .q img,.poster .q canvas{width:62mm;height:62mm;display:block;margin:3mm auto}
 .poster .p-note{font-size:8.5pt;color:#555;line-height:1.4}
+/* Student QR poster (A4 portrait, 1 per page) */
+.sheet.big-poster{display:block;padding:0}
+.bigp{height:297mm;box-sizing:border-box;padding:16mm 18mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3mm;border-top:6mm solid #00b8d9;border-bottom:6mm solid #7c4dff}
+.bigp .bp-event{font-family:var(--f-display);font-weight:700;font-size:22pt;letter-spacing:.02em}
+.bigp .bp-school{font-size:13pt;color:#444}
+.bigp .bp-title{font-weight:700;font-size:34pt;line-height:1.2;margin:4mm 0 2mm}
+.bigp .q img,.bigp .q canvas{width:110mm;height:110mm;display:block;margin:2mm auto}
+.bigp .bp-steps{list-style:decimal;text-align:left;font-size:14pt;line-height:1.7;margin:3mm 0 0;padding-left:8mm}
+.bigp .bp-url{font-family:monospace;font-size:13pt;color:#333;margin-top:4mm;padding:2mm 5mm;border:1px solid #bbb;border-radius:3mm}
 
 /* Big screen / projector */
 .screen{position:fixed;inset:0;z-index:85;overflow:auto;padding:clamp(20px,3vw,48px);background:

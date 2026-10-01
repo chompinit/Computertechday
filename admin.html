@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=15">
+<link rel="stylesheet" href="shared.css?v=16">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -95,6 +95,7 @@
         <div><div class="eyebrow">Student Status</div><h2 class="text-3xl md:text-4xl font-bold mt-1">สถานะนักเรียนรายคน</h2></div>
         <div class="flex flex-wrap gap-2">
           <button class="btn btn-purple btn-sm" id="btnBoard"><i class="fa-solid fa-display"></i> ฉายจอใหญ่</button>
+          <button class="btn btn-ghost btn-sm" data-xlsx><i class="fa-solid fa-file-excel"></i> ดาวน์โหลด Excel</button>
           <button class="btn btn-ghost btn-sm" id="btnCsv"><i class="fa-solid fa-file-csv"></i> ส่งออก CSV</button>
         </div>
       </div>
@@ -219,11 +220,14 @@
             <p class="text-sm muted mt-1">ติด QR นี้ไว้หน้างาน นักเรียนสแกนแล้วกรอกรหัสกับชื่อจริง เพื่อดูฐานที่ผ่านแล้วและดาวน์โหลดเกียรติบัตรเอง</p>
             <div class="link-card mt-4"><div class="qrbox" id="studentQr"></div>
               <div class="min-w-0"><div class="link-url" id="studentUrl"></div>
-              <div class="flex gap-2 mt-2"><a class="chip" id="studentOpen" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิด</a></div></div></div>
+              <div class="flex gap-2 mt-2"><a class="chip" id="studentOpen" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิด</a>
+              <button class="chip" id="btnStudentPoster"><i class="fa-solid fa-print"></i> พิมพ์ป้าย</button></div></div></div>
           </div>
           <div class="glass panel-pad">
             <h3 class="font-semibold text-lg">ข้อมูล</h3>
             <div class="flex flex-col gap-3 mt-4">
+              <button class="btn btn-primary" data-xlsx><i class="fa-solid fa-file-excel"></i> ดาวน์โหลดข้อมูลทั้งหมด (Excel)</button>
+              <p class="text-xs faint -mt-1">ไฟล์เดียวมี 4 แผ่นงาน: สรุปผล · สถานะนักเรียนทุกคน · ประวัติการเช็กอิน · ผลแบบประเมิน</p>
               <button class="btn btn-ghost" id="btnCsvAll"><i class="fa-solid fa-file-csv"></i> ส่งออกประวัติการเช็กอิน (CSV)</button>
               <button class="btn btn-ghost" id="btnCsvSurvey"><i class="fa-solid fa-file-csv"></i> ส่งออกผลแบบประเมิน (CSV)</button>
               <div class="flex items-center justify-between gap-3 local-only">
@@ -264,7 +268,7 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=15"></script>
+<script src="shared.js?v=16"></script>
 <script>
 (() => {
 const {withLoading, parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
@@ -805,6 +809,73 @@ $('#btnPoster').addEventListener('click', () => {
 $('#btnCsvAll').addEventListener('click', () => saveCsv('checkins.csv', [
   ['เวลา','รหัส','ชื่อ-นามสกุล','ชั้น','ฐาน','ชื่อฐาน','ผู้สแกน'],
   ...D.checkins.map(c => { const s = D.students[c.sid] || {}; return [new Date(c.ts).toLocaleString('th-TH'), c.sid, fullName(s), s.cls, c.st, ST[c.st]?.name, c.by]; })]));
+
+/* ป้าย QR หน้างานสำหรับนักเรียน (A4 แนวตั้ง 1 แผ่น สั่งพิมพ์หลายชุดได้จากหน้าพิมพ์) */
+$('#btnStudentPoster').addEventListener('click', () => {
+  const url = new URL('student.html', location.href).href, root = $('#printRoot');
+  root.innerHTML = `<div class="sheet big-poster"><div class="bigp">
+    <div class="bp-emblem">${emblemSVG(false, 72)}</div>
+    <div class="bp-event">Computer &amp; AI Innovation</div>
+    <div class="bp-school">โรงเรียนตันตรารักษ์</div>
+    <h1 class="bp-title">สแกนดูฐานที่ผ่าน<br>และรับเกียรติบัตร</h1>
+    <div class="q" data-q="${esc(url)}"></div>
+    <ol class="bp-steps">
+      <li><b>สแกน QR</b> ด้วยกล้องมือถือ</li>
+      <li>กรอก<b>เลขประจำตัวนักเรียน</b> 4 หลัก</li>
+      <li>กด <b>"แสดง QR ให้ครูสแกน"</b> ทุกครั้งที่เข้าฐาน</li>
+      <li>ผ่านครบ <b>${MIN} ฐาน</b> → ตอบแบบประเมิน → <b>ดาวน์โหลดเกียรติบัตร</b></li>
+    </ol>
+    <div class="bp-url">${esc(url.replace(/^https?:\/\//, ''))}</div>
+  </div></div>`;
+  $$('[data-q]', root).forEach(el => drawQR(el, el.dataset.q, 360, '#000'));
+  root.dataset.kind = 'sheet';
+  setTimeout(() => window.print(), 400);
+});
+
+/* Excel ไฟล์เดียว: สรุปผล + สถานะนักเรียน + ประวัติเช็กอิน + แบบประเมิน (SheetJS) */
+const levelOf = cls => String(cls || '').split('/')[0].trim() || '-';
+const byClass = (a, b) => String(a.cls).localeCompare(String(b.cls), 'th', {numeric:true}) || String(a.sid).localeCompare(String(b.sid), 'th', {numeric:true});
+function sheet(rows, widths){ const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map(w => ({wch:w})); return ws; }
+async function exportXlsx(){
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  const students = Object.values(D.students).sort(byClass), surveys = D.surveys || {};
+  const now = new Date(), stamp = now.toLocaleString('th-TH');
+  const done = s => visitedOf(s.sid).size >= MIN, joined = s => visitedOf(s.sid).size > 0;
+  const levels = [...new Set(students.map(s => levelOf(s.cls)))].sort((a, b) => a.localeCompare(b, 'th', {numeric:true}));
+  const pct = (n, d) => d ? Math.round(n / d * 1000) / 10 + '%' : '-';
+  const nJoined = students.filter(joined).length, nDone = students.filter(done).length;
+  const sum = [
+    ['สรุปผลกิจกรรม Computer & AI Innovation · โรงเรียนตันตรารักษ์'], ['ข้อมูล ณ ' + stamp], [],
+    ['นักเรียนทั้งหมด', students.length],
+    ['เข้าร่วมอย่างน้อย 1 ฐาน', nJoined, pct(nJoined, students.length)],
+    [`ผ่านครบ ${MIN} ฐาน (ได้เกียรติบัตร)`, nDone, pct(nDone, students.length)],
+    ['จำนวนการเช็กอินทั้งหมด', D.checkins.length], ['ตอบแบบประเมิน', Object.keys(surveys).length], [],
+    ['ฐาน', 'ชื่อฐาน', 'วิทยากร', 'ห้อง', 'จำนวนนักเรียนที่ผ่าน'],
+    ...STATIONS.map(st => [st.id, st.name, st.speaker, st.room, D.checkins.filter(c => c.st === st.id).length]), [],
+    ['ระดับชั้น', 'นักเรียนทั้งหมด', 'เข้าร่วม', `ผ่านครบ ${MIN} ฐาน`, 'ร้อยละที่ผ่านครบ'],
+    ...levels.map(l => { const g = students.filter(s => levelOf(s.cls) === l), d = g.filter(done).length; return [l, g.length, g.filter(joined).length, d, pct(d, g.length)]; }),
+  ];
+  const status = [['รหัส', 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'ชั้น', ...STATIONS.map(s => `ฐาน ${s.id}`), 'รวม (ฐาน)', 'สถานะ', 'แบบประเมิน'],
+    ...students.map(s => { const v = visitedOf(s.sid); return [s.sid, s.prefix, s.first, s.last, s.cls, ...STATIONS.map(st => v.has(st.id) ? tFmt(v.get(st.id)) : ''), v.size, v.size >= MIN ? 'ได้เกียรติบัตร' : v.size ? 'ยังไม่ครบ' : 'ยังไม่เข้าร่วม', surveys[s.sid] ? 'ตอบแล้ว' : '']; })];
+  const hist = [['วันที่-เวลา', 'รหัส', 'ชื่อ-นามสกุล', 'ชั้น', 'ฐาน', 'ชื่อฐาน', 'ผู้สแกน'],
+    ...D.checkins.map(c => { const s = D.students[c.sid] || {}; return [new Date(c.ts).toLocaleString('th-TH'), c.sid, fullName(s), s.cls || '', c.st, ST[c.st]?.name || '', c.by]; })];
+  const sv = Object.values(surveys);
+  const avg = k => sv.length ? Math.round(sv.reduce((t, x) => t + (+x[k] || 0), 0) / sv.length * 100) / 100 : '';
+  const survey = [['รหัส', 'ชื่อ-นามสกุล', 'ชั้น', 'เวลา', ...SURVEY.map(q => q.text), 'ฐานที่ชอบที่สุด', 'ความคิดเห็น'],
+    ...sv.map(x => { const s = D.students[x.sid] || {}; return [x.sid, fullName(s), s.cls || '', new Date(x.ts).toLocaleString('th-TH'), ...SURVEY.map(q => +x[q.id] || ''), ST[x.fav] ? ST[x.fav].name : '', x.comment || '']; }),
+    [], ['', 'ค่าเฉลี่ย (เต็ม 5)', '', `${sv.length} คน`, ...SURVEY.map(q => avg(q.id))]];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet(sum, [34, 22, 22, 22, 18]), 'สรุปผล');
+  XLSX.utils.book_append_sheet(wb, sheet(status, [8, 9, 14, 16, 18, ...STATIONS.map(() => 8), 9, 14, 11]), 'สถานะนักเรียน');
+  XLSX.utils.book_append_sheet(wb, sheet(hist, [20, 8, 28, 18, 6, 20, 22]), 'ประวัติเช็กอิน');
+  XLSX.utils.book_append_sheet(wb, sheet(survey, [8, 28, 18, 20, ...SURVEY.map(() => 14), 18, 40]), 'แบบประเมิน');
+  const ymd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  XLSX.writeFile(wb, `ComputerTechDay-ข้อมูล-${ymd}.xlsx`);
+}
+$$('[data-xlsx]').forEach(b => b.addEventListener('click', async () => {
+  try { await withLoading('กำลังสร้างไฟล์ Excel…', exportXlsx); toast({title:'ดาวน์โหลด Excel แล้ว', icon:'fa-file-excel'}); }
+  catch(err) { toast({kind:'err', title:'สร้างไฟล์ไม่สำเร็จ', body:esc(err.message)}); }
+}));
 
 /* ================= Boot ================= */
 if (DB.hasKey()) enter();
