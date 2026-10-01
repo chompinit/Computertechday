@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=14">
+<link rel="stylesheet" href="shared.css?v=15">
 <style>
   body{margin:0}
   .login{max-width:440px;margin-inline:auto}
@@ -98,7 +98,7 @@
 </div>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=14"></script>
+<script src="shared.js?v=15"></script>
 <script>
 (() => {
 const {withLoading, SURVEY, CONFIG, STATIONS, ST, DB, $, esc, fullName, tFmt, store, parseQR, qrPayload, drawQR, decodeImageFile, toast, emblemSVG, gaugeSVG, mountPass, mountCertificate, prepareCertPrint} = CAI;
@@ -146,12 +146,14 @@ async function login(sid, {silent = false, loading = !silent} = {}){
     me = {sid}; store.set(KEY, me);
     msg.textContent = '';
     render(r);
+    // Firebase: ครูสแกนแล้วหน้านี้อัปเดตเองทันที
+    if (DB.watchStudent) DB.watchStudent(sid, x => { if (x && me && me.sid === sid) render(x); });
   } catch(err) {
     if (!silent) msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)} ลองใหม่อีกครั้ง</span>`;
     else toast({kind:'warn', title:'อัปเดตข้อมูลไม่ได้', body:esc(err.message)});
   }
 }
-function showLogin(){ me = null; lastKey = ''; $('#loginView').hidden = false; $('#meView').hidden = true; $('#btnLogout').hidden = $('#btnRefresh').hidden = true; }
+function showLogin(){ me = null; lastKey = ''; if (DB.watchStudent) DB.watchStudent(null); $('#loginView').hidden = false; $('#meView').hidden = true; $('#btnLogout').hidden = $('#btnRefresh').hidden = true; }
 $('#loginForm').addEventListener('submit', e => {
   e.preventDefault();
   const sid = $('#sid').value.trim().toUpperCase();
@@ -265,7 +267,7 @@ window.addEventListener('beforeprint', () => { if ($('#certificate')) prepareCer
 
 /* อัปเดตอัตโนมัติ: โหมดทดลองอัปเดตทันที, โหมดออนไลน์ทุก 20 วินาที */
 if (DB.mode === 'local') DB.subscribe(() => me && login(me.sid, {silent:true}));
-else setInterval(() => { if (me && !document.hidden) login(me.sid, {silent:true}); }, 20000);
+else if (DB.backend !== 'firebase') setInterval(() => { if (me && !document.hidden) login(me.sid, {silent:true}); }, 20000);
 
 const saved = store.get(KEY, null);
 if (saved && saved.sid) { $('#sid').value = saved.sid; login(saved.sid, {silent:true, loading:true}); }

@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=14">
+<link rel="stylesheet" href="shared.css?v=15">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -264,7 +264,7 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=14"></script>
+<script src="shared.js?v=15"></script>
 <script>
 (() => {
 const {withLoading, parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
@@ -275,8 +275,9 @@ let view = 'dashboard', focusSid = null, certSid = null, sim = store.get('ttr-ad
 const keys = {};
 const unchanged = (k, v) => { if (keys[k] === v) return true; keys[k] = v; return false; };
 const visitedOf = sid => VM[sid] || new Map();
+const BACKEND = DB.backend === 'firebase' ? 'Firebase' : 'Google Sheets';
 const modeBadge = () => DB.mode === 'remote'
-  ? '<span class="mode-badge mode-remote"><i class="fa-solid fa-cloud"></i> ออนไลน์ · Google Sheets</span>'
+  ? `<span class="mode-badge mode-remote"><i class="fa-solid fa-cloud"></i> ออนไลน์ · ${BACKEND}</span>`
   : '<span class="mode-badge mode-local"><i class="fa-solid fa-flask"></i> โหมดทดลอง · ข้อมูลในเครื่องนี้</span>';
 
 /* ================= Login ================= */
@@ -284,12 +285,16 @@ $('#gateEmblem').innerHTML = emblemSVG(false, 64);
 $('#brandEmblem').innerHTML = emblemSVG(false, 40);
 $('#gateHint').innerHTML = DB.mode === 'local'
   ? `โหมดทดลอง: PIN คือ <span class="mono">${esc(CONFIG.LOCAL_ADMIN_PIN)}</span> (เปลี่ยนได้ใน shared.js)`
-  : 'ใช้ ADMIN_KEY ที่ตั้งไว้ใน Google Apps Script';
+  : DB.backend === 'firebase' ? 'ใช้บัญชี Google ของโรงเรียนที่ได้รับสิทธิ์ผู้ดูแล' : 'ใช้ ADMIN_KEY ที่ตั้งไว้ใน Google Apps Script';
+if (DB.backend === 'firebase') {
+  $('#pin').remove();
+  $('#gateForm button').innerHTML = '<i class="fa-brands fa-google"></i> เข้าสู่ระบบด้วย Google';
+}
 $('#gateForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = $('#gateMsg');
   msg.textContent = 'กำลังตรวจสอบ…';
-  try { await withLoading('กำลังตรวจสอบรหัส…', () => DB.login($('#pin').value.trim())); enter(); }
+  try { await withLoading('กำลังตรวจสอบสิทธิ์…', () => DB.login($('#pin') ? $('#pin').value.trim() : '')); enter(); }
   catch(err) { msg.innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; const c = $('.gate-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
 });
 $('#btnLogout').addEventListener('click', () => { DB.logout(); location.reload(); });
@@ -302,7 +307,7 @@ async function enter(){
   go(TABS.some(t => t.v === h) ? h : 'dashboard', false);
   DB.stationTokens().then(t => { TOKENS = t || {}; keys.links = null; if (view === 'settings') renderSettings(); })
     .catch(err => toast({kind:'warn', title:'โหลดรหัสลิงก์ครูไม่ได้', body:esc(err.message) + ' · กดรีเฟรชหน้าเพื่อลองใหม่'}));
-  await withLoading('กำลังโหลดข้อมูลจาก Google Sheets…<div class="g-sub">ครั้งแรกอาจใช้ 10–20 วินาที</div>', refresh);
+  await withLoading(DB.backend === 'firebase' ? 'กำลังโหลดข้อมูล…' : 'กำลังโหลดข้อมูลจาก Google Sheets…<div class="g-sub">ครั้งแรกอาจใช้ 10–20 วินาที</div>', refresh);
   $('#loadingBar').hidden = true;
   DB.subscribe(refresh);
   DB._onLocal = refresh;
@@ -372,7 +377,7 @@ function renderDashboard(){
   const eligible = Object.values(VM).filter(m => m.size >= MIN).length;
   const started = Object.values(VM).length;
   const max = Math.max(1, ...Object.values(counts));
-  $('#liveText').textContent = DB.mode === 'local' ? (sim ? 'จำลองผู้เข้าร่วมอยู่' : 'อัปเดตทันทีเมื่อครูสแกน') : `อัปเดตทุก ${CONFIG.POLL_MS / 1000} วินาที`;
+  $('#liveText').textContent = DB.mode === 'local' ? (sim ? 'จำลองผู้เข้าร่วมอยู่' : 'อัปเดตทันทีเมื่อครูสแกน') : DB.backend === 'firebase' ? 'อัปเดตทันทีเมื่อครูสแกน' : `อัปเดตทุก ${CONFIG.POLL_MS / 1000} วินาที`;
   $('#kpis').innerHTML = [
     ['ผู้ลงทะเบียน', students.length, 'fa-users', 'var(--blue)', `เริ่มเข้าฐานแล้ว ${started} คน`],
     ['เช็กอินรวม', D.checkins.length, 'fa-qrcode', 'var(--purple)', `เฉลี่ย ${(students.length ? D.checkins.length / students.length : 0).toFixed(1)} ฐาน/คน`],
@@ -757,6 +762,8 @@ function renderSettings(){
     <h3 class="font-semibold text-lg">${modeBadge()}</h3>
     <p class="text-sm muted mt-3">ตอนนี้ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้ เปิดหน้าครูกับหน้า Admin ในเบราว์เซอร์เดียวกันจะเห็นข้อมูลกันทันที เหมาะสำหรับทดลองระบบ</p>
     <p class="text-sm mt-3">ถ้าจะใช้งานจริงกับครูหลายเครื่อง ให้ติดตั้ง Google Apps Script ตามไฟล์ <span class="mono">README.md</span> แล้ววาง URL ลงใน <span class="mono">API_URL</span> ในไฟล์ <span class="mono">shared.js</span></p>`
+    : DB.backend === 'firebase' ? `<h3 class="font-semibold text-lg">${modeBadge()}</h3><p class="text-sm muted mt-3">ทุกเครื่องบันทึกลงฐานข้อมูล Firebase ชุดเดียวกัน แดชบอร์ดอัปเดตทันทีเมื่อครูสแกน</p>
+      <div class="link-url mt-3">console.firebase.google.com/project/${esc(CONFIG.FIREBASE.projectId)}</div>`
     : `<h3 class="font-semibold text-lg">${modeBadge()}</h3><p class="text-sm muted mt-3">ทุกเครื่องบันทึกลง Google Sheets ชุดเดียวกัน แดชบอร์ดดึงข้อมูลใหม่ทุก ${CONFIG.POLL_MS / 1000} วินาที</p>
       <div class="link-url mt-3">${esc(CONFIG.API_URL)}</div>`;
   $('#simSwitch').setAttribute('aria-checked', sim);

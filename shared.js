@@ -7,6 +7,13 @@ const CONFIG = {
   // วาง URL ของ Google Apps Script Web App (ลงท้ายด้วย /exec) เพื่อให้ทุกเครื่องใช้ข้อมูลชุดเดียวกัน
   // เว้นว่าง '' = โหมดทดลอง เก็บข้อมูลในเบราว์เซอร์เครื่องนี้เท่านั้น
   API_URL: 'https://script.google.com/macros/s/AKfycbyE13dcZ3FvZ0NhCtMxHo3oyYrpbuBhTbt-CsVsgYfW_NZQjNIjkJ4jeJncdPRq1Tl-fA/exec',
+  // ฐานข้อมูล Firebase (เร็วกว่า + อัปเดตทันที) ถ้าใส่ไว้จะใช้แทน API_URL · ตั้งเป็น null = กลับไปใช้ Google Sheets เหมือนเดิม
+  FIREBASE: {
+    apiKey: 'AIzaSyDjp-IAwebls1eTKp2YvwVEaOuLF9B3bSY',
+    authDomain: 'tantrarak-ai-checkin.firebaseapp.com',
+    projectId: 'tantrarak-ai-checkin',
+    appId: '1:336637667708:web:ff2f2357214b3ee0d09cf9',
+  },
   // PIN เข้าหน้า Admin ในโหมดทดลอง (โหมดออนไลน์ใช้ ADMIN_KEY ใน Code.gs แทน)
   LOCAL_ADMIN_PIN: '2569',
   MIN_STATIONS: 5,
@@ -149,7 +156,8 @@ function normalizeRemote(j){
 }
 
 const DB = {
-  mode: CONFIG.API_URL ? 'remote' : 'local',
+  mode: CONFIG.FIREBASE || CONFIG.API_URL ? 'remote' : 'local',
+  backend: CONFIG.FIREBASE ? 'firebase' : CONFIG.API_URL ? 'sheets' : 'local',
   setKey(k){ apiKey = k || ''; store.sset('ttr-cai-admin-key', k || null); },
   hasKey(){ return !!apiKey; },
   async login(pin){
@@ -275,6 +283,223 @@ const DB = {
 };
 const _write = Local.write; Local.write = d => { _write(d); DB._onLocal && DB._onLocal(); };
 
+/* ================= Firebase (Firestore) =================
+   students/{sid} = ข้อมูลนักเรียน + ck {ฐาน: {ts, by}} + sv (ตอบแบบประเมินแล้ว) → หน้านักเรียนอ่านเอกสารเดียวจบ
+   checkins/{sid_st} = หลักฐานการสแกนพร้อมรหัสฐาน (กฎความปลอดภัยตรวจรหัสลิงก์ครู) · Admin เข้าด้วย Google (ดู firebase/firestore.rules) */
+const FB_SDK = 'https://www.gstatic.com/firebasejs/12.19.0/';
+let fbP = null, authP = null;
+function fb(){
+  return fbP ||= Promise.all([import(FB_SDK + 'firebase-app.js'), import(FB_SDK + 'firebase-firestore.js')])
+    .then(([app, fs]) => { const a = app.initializeApp(CONFIG.FIREBASE); return {a, fs, db:fs.getFirestore(a)}; })
+    .catch(e => { fbP = null; throw netError('โหลดระบบฐานข้อมูลไม่ได้ ตรวจสอบอินเทอร์เน็ต'); });
+}
+/* ระบบล็อกอิน Google (โหลดเฉพาะหน้า Admin) → รอจนรู้ว่าล็อกอินค้างไว้หรือไม่ */
+function fbAuth(){
+  return authP ||= Promise.all([fb(), import(FB_SDK + 'firebase-auth.js')]).then(([{a}, au]) => {
+    const auth = au.getAuth(a);
+    return new Promise(res => { const off = au.onAuthStateChanged(auth, () => { off(); res({au, auth}); }); });
+  }).catch(e => { authP = null; throw e; });
+}
+function withTimeout(p, ms, msg = 'เซิร์ฟเวอร์ตอบช้าเกินไป'){
+  let t; return Promise.race([p, new Promise((_, rej) => t = setTimeout(() => rej(netError(msg)), ms))]).finally(() => clearTimeout(t));
+}
+function fbErr(e){
+  if (e && e.network) return e;
+  const code = e && e.code || '';
+  if (/unavailable|deadline-exceeded|network/.test(code)) return netError('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้');
+  if (/permission-denied|unauthenticated/.test(code)) { const x = new Error('ไม่มีสิทธิ์ทำรายการนี้'); x.code = 'denied'; return x; }
+  return e instanceof Error ? e : new Error(String(e));
+}
+async function fbRun(fn, ms = 12000){
+  if (!navigator.onLine) throw netError('ไม่มีอินเทอร์เน็ต');
+  try { return await withTimeout(fb().then(fn), ms); } catch(e) { throw fbErr(e); }
+}
+const ckList = (sid, d) => Object.entries(d.ck || {}).map(([st, c]) => ({sid, st:+st, ts:+c.ts, by:c.by || ''})).sort((a,b) => a.ts - b.ts);
+const stuOf = (sid, d) => ({sid, prefix:d.prefix || '', first:d.first || '', last:d.last || '', cls:d.cls || '', created:d.created || 0});
+const validStu = s => /^[A-Za-z0-9]{4,10}$/.test(String(s.sid || '').trim()) && !!s.first;
+const stuDoc = s => ({sid:String(s.sid).trim(), prefix:s.prefix || '', first:s.first, last:s.last || '', cls:s.cls || '', created:Date.now(), ck:{}});
+
+/* Admin: ต้องล็อกอิน Google ด้วยบัญชีที่มีสิทธิ์ (ข้อความมีคำว่า "รหัสผู้ดูแล" → หน้า Admin จะพากลับไปหน้าเข้าสู่ระบบ) */
+async function adminReady(){
+  const {auth} = await fbAuth();
+  if (!auth.currentUser) throw new Error('สิทธิ์รหัสผู้ดูแลหมดอายุ กรุณาเข้าสู่ระบบด้วย Google อีกครั้ง');
+  return fb();
+}
+/* ข้อมูลสด (Admin): ฟังการเปลี่ยนแปลงของ students + surveys แล้วแจ้งหน้าแดชบอร์ดทันทีที่ครูสแกน */
+const live = {students:{}, ck:{}, surveys:{}, fns:new Set(), ready:null};
+function startLive(){
+  return live.ready ||= adminReady().then(({fs, db}) => new Promise((res, rej) => {
+    const got = new Set();
+    const done = k => { if (got.size === 2) return live.fns.forEach(f => f()); got.add(k); if (got.size === 2) res(); };
+    const fail = e => { live.ready = null; rej(fbErr(e)); };
+    fs.onSnapshot(fs.collection(db, 'students'), snap => {
+      snap.docChanges().forEach(ch => {
+        const sid = ch.doc.id;
+        if (ch.type === 'removed') { delete live.students[sid]; delete live.ck[sid]; return; }
+        const d = ch.doc.data(); live.students[sid] = stuOf(sid, d); live.ck[sid] = ckList(sid, d);
+      });
+      done('students');
+    }, fail);
+    fs.onSnapshot(fs.collection(db, 'surveys'), snap => {
+      snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete live.surveys[ch.doc.id]; else live.surveys[ch.doc.id] = ch.doc.data(); });
+      done('surveys');
+    }, fail);
+  }));
+}
+
+const FB = {
+  async stations(){ return fbRun(async ({fs, db}) => { const s = await fs.getDoc(fs.doc(db, 'config', 'stations')); return s.exists() ? s.data().list || [] : []; }); },
+  async login(){
+    const {au, auth} = await fbAuth();
+    const p = new au.GoogleAuthProvider(); p.setCustomParameters({prompt:'select_account', hd:'tr.ac.th'});
+    try { await au.signInWithPopup(auth, p); }
+    catch(e) { throw new Error(/popup-closed|cancelled/.test(e.code) ? 'ยกเลิกการเข้าสู่ระบบ' : /popup-blocked/.test(e.code) ? 'เบราว์เซอร์บล็อกหน้าต่างล็อกอิน กรุณาอนุญาตป๊อปอัปแล้วลองใหม่' : 'เข้าสู่ระบบไม่สำเร็จ: ' + (e.code || e.message)); }
+    // ตรวจสิทธิ์ผู้ดูแลจริงจากกฎความปลอดภัย (อ่าน keys ได้เฉพาะ Admin)
+    try { await fbRun(({fs, db}) => fs.getDocs(fs.collection(db, 'keys'))); }
+    catch(e) { if (e.code === 'denied') { const email = auth.currentUser && auth.currentUser.email; await au.signOut(auth); throw new Error(`บัญชี ${email || ''} ไม่มีสิทธิ์ผู้ดูแล`); } throw e; }
+    DB.setKey('google'); return true;
+  },
+  logout(){ DB.setKey(''); fbAuth().then(({au, auth}) => au.signOut(auth)).catch(() => {}); },
+  async all(){
+    await startLive();
+    const checkins = Object.values(live.ck).flat().sort((a,b) => a.ts - b.ts);
+    return {v:2, students:{...live.students}, checkins, surveys:{...live.surveys}};
+  },
+  /* ครูสแกน: อ่าน → ถ้ายังไม่เคยผ่านฐานนี้ บันทึกพร้อมกันทั้งหลักฐาน (checkins) และฐานที่ผ่าน (students.ck) */
+  async checkin(sid, st, by = '', ts = Date.now(), tk = ''){
+    sid = String(sid).trim(); st = +st;
+    try {
+      return await fbRun(({fs, db}) => fs.runTransaction(db, async tx => {
+        const ref = fs.doc(db, 'students', sid), snap = await tx.get(ref);
+        if (!snap.exists()) return {status:'unknown'};
+        const d = snap.data(), n = Object.keys(d.ck || {}).length, student = stuOf(sid, d);
+        if ((d.ck || {})[st]) return {status:'dup', student, count:n};
+        const now = Date.now(), when = ts > now - 2 * 86400e3 && ts < now + 60e3 ? Math.round(ts) : now;
+        const who = String(by || '').slice(0, 60);
+        tx.set(fs.doc(db, 'checkins', `${sid}_${st}`), {sid, st, ts:when, by:who, tk:String(tk || '')});
+        tx.update(ref, {[`ck.${st}`]:{ts:when, by:who}, lk:String(st)});
+        return {status:'ok', student, count:n + 1};
+      }, {maxAttempts:3}));
+    } catch(e) {
+      if (e.code === 'denied') { const x = new Error('ลิงก์ฐานนี้ไม่ถูกต้อง ขอลิงก์ใหม่จาก Admin'); x.code = 'bad_token'; throw x; }
+      throw e;
+    }
+  },
+  async studentView(sid){
+    sid = String(sid).trim();
+    if (!/^[A-Za-z0-9-]{1,12}$/.test(sid)) return null;
+    const s = await fbRun(({fs, db}) => fs.getDoc(fs.doc(db, 'students', sid)));
+    if (!s.exists()) return null;
+    const d = s.data();
+    return {student:stuOf(sid, d), surveyed:!!d.sv, checkins:ckList(sid, d)};
+  },
+  /* หน้านักเรียน: อัปเดตทันทีเมื่อครูสแกน (ฟังเอกสารของตัวเองเอกสารเดียว) */
+  watchStudent(sid, fn){
+    if (FB._unwatch) { FB._unwatch(); FB._unwatch = null; }
+    if (!sid) return;
+    fb().then(({fs, db}) => {
+      FB._unwatch = fs.onSnapshot(fs.doc(db, 'students', String(sid)), s => {
+        if (!s.exists()) return fn(null);
+        const d = s.data(); fn({student:stuOf(s.id, d), surveyed:!!d.sv, checkins:ckList(s.id, d)});
+      }, () => {});
+    }).catch(() => {});
+  },
+  async survey(sid, answers){
+    sid = String(sid).trim();
+    const n = k => Math.max(1, Math.min(5, Math.round(Number(answers[k]) || 0)));
+    const doc = {sid, ts:Date.now(), q1:n('q1'), q2:n('q2'), q3:n('q3'), q4:n('q4'),
+      fav:Math.max(0, Math.min(8, Math.round(Number(answers.fav) || 0))), comment:String(answers.comment || '').slice(0, 500)};
+    try {
+      await fbRun(({fs, db}) => { const b = fs.writeBatch(db); b.set(fs.doc(db, 'surveys', sid), doc); b.update(fs.doc(db, 'students', sid), {sv:true}); return b.commit(); });
+      return {ok:true};
+    } catch(e) {
+      if (e.code !== 'denied') throw e;
+      const v = await FB.studentView(sid);
+      if (!v) throw new Error('ไม่พบข้อมูลนักเรียน');
+      if (v.surveyed) return {ok:true, already:true};
+      throw new Error('ส่งแบบประเมินไม่สำเร็จ');
+    }
+  },
+  async verify(code){
+    code = String(code || '').trim().toUpperCase();
+    const m = code.match(/^TTR-CAI-69-([A-Z0-9]{3,12})-[0-9A-Z]{5}$/);
+    if (!m) return {valid:false};
+    const v = await FB.studentView(m[1]);
+    if (!v || certCode(v.student) !== code) return {valid:false};
+    const count = new Set(v.checkins.map(c => c.st)).size;
+    return {valid:count >= CONFIG.MIN_STATIONS, name:fullName(v.student), cls:v.student.cls, count, reason:count >= CONFIG.MIN_STATIONS ? '' : 'not_eligible'};
+  },
+  /* รหัสลิงก์ครูแต่ละฐาน (สร้างให้อัตโนมัติถ้ายังไม่มี) */
+  async stationTokens(){
+    const {fs, db} = await adminReady();
+    try {
+      const snap = await fs.getDocs(fs.collection(db, 'keys')), out = {};
+      snap.forEach(d => out[d.id] = d.data().tk);
+      const missing = STATIONS.filter(s => !out[s.id]);
+      if (missing.length) {
+        const b = fs.writeBatch(db);
+        missing.forEach(s => { const tk = [...crypto.getRandomValues(new Uint8Array(4))].map(x => x.toString(16).padStart(2, '0')).join(''); out[s.id] = tk; b.set(fs.doc(db, 'keys', String(s.id)), {tk}); });
+        await b.commit();
+      }
+      return out;
+    } catch(e) { throw fbErr(e); }
+  },
+  async register(stu){
+    if (!validStu(stu)) throw new Error('ข้อมูลไม่ครบหรือเลขประจำตัวไม่ถูกต้อง');
+    const {fs, db} = await adminReady(), sid = String(stu.sid).trim(), ref = fs.doc(db, 'students', sid);
+    try {
+      const s = await fs.getDoc(ref);
+      if (s.exists()) return {status:'exists', student:stuOf(sid, s.data())};
+      const d = stuDoc(stu); await fs.setDoc(ref, d);
+      return {status:'ok', student:stuOf(sid, d)};
+    } catch(e) { throw fbErr(e); }
+  },
+  async importMany(list){
+    await startLive();
+    const {fs, db} = await fb();
+    let skipped = 0; const add = new Map();
+    list.forEach(s => { const sid = String(s.sid || '').trim(); if (!validStu(s) || live.students[sid] || add.has(sid)) skipped++; else add.set(sid, stuDoc(s)); });
+    const docs = [...add.values()];
+    try {
+      for (let i = 0; i < docs.length; i += 400) {
+        const b = fs.writeBatch(db);
+        docs.slice(i, i + 400).forEach(d => b.set(fs.doc(db, 'students', d.sid), d));
+        await b.commit();
+      }
+    } catch(e) { throw fbErr(e); }
+    return {added:docs.length, skipped};
+  },
+  async removeCheckin(sid, st){
+    const {fs, db} = await adminReady();
+    try {
+      const b = fs.writeBatch(db);
+      b.update(fs.doc(db, 'students', String(sid)), {[`ck.${+st}`]:fs.deleteField()});
+      b.delete(fs.doc(db, 'checkins', `${sid}_${+st}`));
+      await b.commit(); return {ok:true};
+    } catch(e) { throw fbErr(e); }
+  },
+  async saveStation(st){
+    const row = {id:+st.id, name:String(st.name || '').trim().slice(0, 60), th:String(st.th || '').trim().slice(0, 80), speaker:String(st.speaker || '').trim().slice(0, 80), room:String(st.room || '').trim().slice(0, 80), desc:String(st.desc || '').trim().slice(0, 200)};
+    if (!row.name) throw new Error('ต้องมีชื่อฐาน');
+    const {fs, db} = await adminReady();
+    let list;
+    try {
+      const ref = fs.doc(db, 'config', 'stations'), s = await fs.getDoc(ref);
+      list = (s.exists() ? s.data().list || [] : []).filter(x => +x.id !== row.id).concat([row]).sort((a,b) => a.id - b.id);
+      await fs.setDoc(ref, {list});
+    } catch(e) { throw fbErr(e); }
+    store.set(SKEY, list); applyStations(list);
+    window.dispatchEvent(new Event('stations-updated'));
+    return {ok:true};
+  },
+  subscribe(fn){ live.fns.add(fn); },
+};
+if (DB.backend === 'firebase') {
+  ['login', 'logout', 'all', 'checkin', 'studentView', 'watchStudent', 'survey', 'verify', 'stationTokens', 'register', 'importMany', 'removeCheckin', 'saveStation', 'subscribe']
+    .forEach(k => DB[k] = FB[k]);
+  fb().catch(() => {}); // เริ่มโหลดไลบรารีทันทีที่เปิดหน้า
+}
+
 /* ================= ชื่อฐานที่ Admin แก้ไข =================
    ใช้ค่าที่จำไว้ในเครื่องก่อน (เปิดหน้าได้ทันที) แล้วดึงค่าล่าสุดจากเซิร์ฟเวอร์ ถ้าเปลี่ยนจะแจ้ง 'stations-updated' */
 const SKEY = 'ttr-stations-v1';
@@ -293,7 +518,7 @@ applyStations(store.get(SKEY, []));
 async function refreshStations(){
   if (DB.mode !== 'remote') return;
   try {
-    const list = (await api('GET', {action:'stations'})).stations || [];
+    const list = DB.backend === 'firebase' ? await FB.stations() : (await api('GET', {action:'stations'})).stations || [];
     store.set(SKEY, list);
     if (applyStations(list)) window.dispatchEvent(new Event('stations-updated'));
   } catch(e) {}
