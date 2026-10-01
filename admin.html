@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=19">
+<link rel="stylesheet" href="shared.css?v=21">
 <style>body{margin:0}</style>
 </head>
 <body>
@@ -274,7 +274,7 @@
 <datalist id="studentList"></datalist>
 <div id="printRoot"></div>
 
-<script src="shared.js?v=19"></script>
+<script src="shared.js?v=21"></script>
 <script>
 (() => {
 const {withLoading, parseStudentReport, loadScript, SURVEY, CONFIG, STATIONS, ST, DB, $, $$, esc, fullName, initials, tFmt, dFmt, store, qrPayload, parseCode, certCode, visitedMap,
@@ -578,8 +578,15 @@ function filtered(){
     if (st === 'doing' && (n === 0 || n >= MIN)) return false;
     if (st === 'none' && n !== 0) return false;
     return true;
-  }).sort((a,b) => a.cls.localeCompare(b.cls, 'th', {numeric:true}) || a.sid.localeCompare(b.sid));
+  }).sort((a,b) => lastOf(b.sid).ts - lastOf(a.sid).ts || a.cls.localeCompare(b.cls, 'th', {numeric:true}) || a.sid.localeCompare(b.sid));
 }
+/* เช็กอินล่าสุดของนักเรียน → {ts, st} (ยังไม่เคยเข้าฐาน = ts 0) */
+function lastOf(sid){
+  let ts = 0, st = 0;
+  visitedOf(sid).forEach((t, id) => { if (t > ts) { ts = t; st = id; } });
+  return {ts, st};
+}
+let topSid = null;
 function statusPill(n){
   return n >= MIN ? '<span class="pill pill-green"><i class="fa-solid fa-award"></i> ครบแล้ว</span>'
     : n > 0 ? `<span class="pill pill-blue">ขาด ${MIN - n}</span>` : '<span class="pill pill-dim">ยังไม่เริ่ม</span>';
@@ -588,9 +595,13 @@ function renderStudents(){
   const list = filtered();
   $('#rowCount').textContent = `แสดง ${list.length} จาก ${Object.keys(D.students).length} คน`;
   if (!unchanged('rows', list.map(s => s.sid + visitedOf(s.sid).size).join() + focusSid)) {
-    $('#rows').innerHTML = list.length ? list.map(s => { const v = visitedOf(s.sid);
-      return `<tr data-sid="${esc(s.sid)}" aria-selected="${s.sid === focusSid}">
-        <td class="mono">${esc(s.sid)}</td><td>${esc(fullName(s))}${s.demo ? ' <span class="faint text-xs">(ตัวอย่าง)</span>' : ''}</td><td>${esc(s.cls)}</td>
+    // คนที่เพิ่งเข้าฐานล่าสุดขึ้นแถวแรก + ไฮไลต์สั้น ๆ เมื่อมีคนใหม่ขึ้นมาอันดับ 1
+    const first = list[0] && lastOf(list[0].sid).ts ? list[0].sid + ':' + lastOf(list[0].sid).ts : null;
+    const flashSid = topSid !== null && first && first !== topSid ? list[0].sid : null;
+    topSid = first || '';
+    $('#rows').innerHTML = list.length ? list.map(s => { const v = visitedOf(s.sid), last = lastOf(s.sid);
+      return `<tr data-sid="${esc(s.sid)}" aria-selected="${s.sid === focusSid}"${s.sid === flashSid ? ' class="row-new"' : ''}>
+        <td class="mono">${esc(s.sid)}</td><td>${esc(fullName(s))}${s.demo ? ' <span class="faint text-xs">(ตัวอย่าง)</span>' : ''}${last.ts ? `<div class="text-xs faint"><i class="fa-solid fa-clock"></i> ล่าสุด <span class="mono">${tFmt(last.ts)}</span> · ฐาน ${last.st}</div>` : ''}</td><td>${esc(s.cls)}</td>
         <td><div class="dots sm">${STATIONS.map(st => `<span class="dot ${v.has(st.id)?'on':''}" style="--h:${st.h}" title="${esc(st.name)}"></span>`).join('')}</div></td>
         <td class="mono text-right">${v.size}/${STATIONS.length}</td><td>${statusPill(v.size)}</td></tr>`; }).join('')
       : '<tr><td colspan="6"><div class="empty my-4">ไม่พบนักเรียนตามเงื่อนไขที่เลือก</div></td></tr>';

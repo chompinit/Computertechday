@@ -424,6 +424,8 @@ table.data th{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-
 table.data td{padding:11px 14px;border-top:1px solid rgba(125,160,255,.08);vertical-align:middle}
 table.data tbody tr{cursor:pointer;transition:background .15s}
 table.data tbody tr:hover{background:rgba(45,226,255,.05)}
+table.data tbody tr.row-new{animation:rowNew 2.4s ease-out}
+@keyframes rowNew{0%,30%{background:rgba(57,255,159,.22)}100%{background:transparent}}
 table.data tbody tr[aria-selected="true"]{background:linear-gradient(90deg, rgba(45,226,255,.12), rgba(155,92,255,.06))}
 .dots.sm .dot{width:11px;height:11px;border-radius:4px}
 

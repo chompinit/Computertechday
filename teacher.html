@@ -10,7 +10,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<link rel="stylesheet" href="shared.css?v=19">
+<link rel="stylesheet" href="shared.css?v=21">
 <style>
   body{margin:0}
   .scanner{max-width:520px;transform:none}
@@ -105,7 +105,7 @@
   </main>
 </div>
 
-<script src="shared.js?v=19"></script>
+<script src="shared.js?v=21"></script>
 <script>
 (() => {
 const {showLoading, hideLoading, withLoading, STATIONS, ST, DB, $, esc, fullName, initials, tFmt, store, parseQR, createCamera, beep, toast, flash, emblemSVG, CONFIG} = CAI;
@@ -129,10 +129,21 @@ function renderStation(){
   const s = ST[station];
   $('#stationCard').innerHTML = `<div class="st-icon" style="--h:${s.h};width:48px;height:48px;font-size:20px"><i class="fa-solid ${s.icon}"></i></div>
     <div class="min-w-0"><div class="text-xs faint">กำลังบันทึกเข้า</div><div style="font-family:var(--f-display);font-weight:700;font-size:18px">ฐานที่ ${s.id} · ${esc(s.name)}</div><div class="text-xs muted">${esc(s.th)} · ${esc(s.room)}</div>
-    ${DB.mode === 'remote' && !tokenFor(station) ? '<div class="text-xs mt-1" style="color:var(--amber)"><i class="fa-solid fa-key"></i> เครื่องนี้ยังไม่มีรหัสของฐานนี้ ให้เปิดจากลิงก์หรือ QR ประจำฐานที่ได้จาก Admin</div>' : ''}</div>`;
+    ${DB.mode === 'remote' && !tokenFor(station) ? `<div class="text-sm mt-2 p-2 rounded-lg" style="color:var(--amber);border:1px solid rgba(255,194,75,.45);background:rgba(255,194,75,.1)"><i class="fa-solid fa-key"></i> <b>เครื่องนี้ยังไม่มีรหัสของฐานที่ ${s.id}</b><br>ใช้กล้องในหน้านี้สแกน <b>QR ประจำฐานที่ ${s.id}</b> (จากป้ายฐาน หรือหน้า Admin › ตั้งค่า &amp; ลิงก์ครู) 1 ครั้ง แล้วสแกนนักเรียนได้เลย</div>` : ''}</div>`;
   renderRecent();
 }
 $('#stationSel').addEventListener('change', e => { station = +e.target.value; store.set('ttr-teacher-station', station); renderStation(); showIdle(); });
+/* รับลิงก์ประจำฐาน (teacher.html#st3-xxxx) ได้ทุกทาง: เปิดลิงก์ขณะหน้านี้เปิดค้าง (hash เปลี่ยนแต่หน้าไม่โหลดใหม่) หรือใช้กล้องหน้านี้สแกน QR ประจำฐาน */
+function applyStationLink(text){
+  const m = String(text || '').match(/#st(\d+)-([a-z0-9]+)/i);
+  if (!m || !ST[+m[1]]) return false;
+  station = +m[1]; tokens[station] = m[2].toLowerCase();
+  store.set('ttr-teacher-tokens', tokens); store.set('ttr-teacher-station', station);
+  $('#stationSel').value = station; renderStation(); showIdle();
+  toast({title:`บันทึกรหัสฐานที่ ${station} แล้ว`, body:'สแกนบัตรนักเรียนได้เลย', icon:'fa-key'});
+  return true;
+}
+window.addEventListener('hashchange', () => applyStationLink(location.hash));
 $('#teacherName').value = store.get('ttr-teacher-name', '');
 $('#teacherName').addEventListener('change', e => store.set('ttr-teacher-name', e.target.value.trim()));
 
@@ -171,7 +182,7 @@ function showResult(r, sid){
   void el.offsetWidth;
   if (r.status === 'badtoken') {
     el.innerHTML = `<span class="pill" style="color:var(--red);border:1px solid rgba(255,77,122,.4);background:rgba(255,77,122,.1)"><i class="fa-solid fa-key"></i> ไม่มีสิทธิ์บันทึกฐานนี้</span>
-      <div class="r-name mt-4" style="font-size:24px">ลิงก์ฐานไม่ถูกต้อง</div><p class="muted mt-2">เปิดหน้านี้จากลิงก์หรือ QR ประจำฐานที่ได้จาก Admin (แท็บ ตั้งค่า &amp; ลิงก์ครู) แล้วสแกนใหม่</p>`;
+      <div class="r-name mt-4" style="font-size:24px">ยังไม่มีรหัสฐานที่ ${s.id}</div><p class="muted mt-2">ใช้กล้องในหน้านี้สแกน <b>QR ประจำฐานที่ ${s.id}</b> (จากป้ายฐาน หรือหน้า Admin › ตั้งค่า &amp; ลิงก์ครู) 1 ครั้ง แล้วสแกนนักเรียนคนนี้ใหม่</p>`;
     return;
   }
   if (r.status === 'unknown') {
@@ -258,6 +269,7 @@ async function handle(raw, source){
   const now = Date.now();
   if (busy || (source === 'camera' && raw === lastRaw && now - lastAt < 4000)) return;
   lastRaw = raw; lastAt = now;
+  if (/teacher\.html#st\d+-/i.test(raw) && applyStationLink(raw)) { beep('ok'); return; }
   const qr = parseQR(raw);
   const scanner = $('#scanner');
   const mark = c => { scanner.classList.remove('hit','warn'); void scanner.offsetWidth; scanner.classList.add(c); setTimeout(() => scanner.classList.remove(c), 1200); };
